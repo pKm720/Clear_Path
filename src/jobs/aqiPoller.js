@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { fetchBengaluruAQI } = require('../services/aqiService');
 const SensorReading = require('../models/SensorReading');
+const { buildGraph } = require('../services/graphService');
 
 /**
  * The Heartbeat: Polls AQI data from WAQI every 15 minutes.
@@ -36,6 +37,10 @@ const runPoll = async () => {
 
       const result = await SensorReading.bulkWrite(bulkOps);
       console.log(`AQI Poll Complete. Updated/Inserted ${result.upsertedCount + result.modifiedCount} stations.`);
+
+      // Now with fresh AQI data, rebuilding the road graph with new health weights
+      console.log('Rebuilding road graph with fresh AQI weights...');
+      await buildGraph();
     } else {
       console.log('No valid AQI readings fetched from WAQI.');
     }
