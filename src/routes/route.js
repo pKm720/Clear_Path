@@ -14,20 +14,26 @@ const { calculateRoute } = require('../controllers/routeController');
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [start, end]
  *             properties:
  *               start:
  *                 type: object
  *                 properties:
- *                   lat: { type: number }
- *                   lon: { type: number }
+ *                   lat: { type: number, example: 12.9095 }
+ *                   lon: { type: number, example: 77.5668 }
  *               end:
  *                 type: object
  *                 properties:
- *                   lat: { type: number }
- *                   lon: { type: number }
+ *                   lat: { type: number, example: 12.9218 }
+ *                   lon: { type: number, example: 77.6144 }
+ *               transport:
+ *                 type: string
+ *                 enum: [car, motorbike, pedestrian]
+ *                 default: car
+ *                 description: Transport mode affects accessible roads and journey speed.
  *     responses:
  *       200:
- *         description: Array of calculated routes with stats.
+ *         description: Array of calculated routes (cleanest, balanced, fastest) with stats.
  */
 router.post('/', calculateRoute);
 

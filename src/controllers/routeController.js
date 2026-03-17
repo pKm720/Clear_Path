@@ -1,19 +1,15 @@
 const { getRoutes } = require('../services/routingService');
 
-/**
- * Validates coordinate object structure.
- */
+const VALID_TRANSPORT_MODES = ['car', 'motorbike', 'pedestrian'];
+
 function isValidCoord(coord) {
   return coord && 
          typeof coord.lat === 'number' && 
          (typeof coord.lng === 'number' || typeof coord.lon === 'number');
 }
 
-/**
- * Handles POST requests to calculate paths between start and end coordinates.
- */
 const calculateRoute = async (req, res) => {
-  const { start, end } = req.body;
+  const { start, end, transport = 'car' } = req.body;
 
   if (!isValidCoord(start) || !isValidCoord(end)) {
     return res.status(400).json({ 
@@ -21,8 +17,14 @@ const calculateRoute = async (req, res) => {
     });
   }
 
+  if (!VALID_TRANSPORT_MODES.includes(transport)) {
+    return res.status(400).json({
+      error: `Invalid transport mode. Must be one of: ${VALID_TRANSPORT_MODES.join(', ')}`
+    });
+  }
+
   try {
-    const routes = await getRoutes(start, end);
+    const routes = await getRoutes(start, end, transport);
     res.json({ routes });
   } catch (error) {
     console.error('Route controller error:', error.message);

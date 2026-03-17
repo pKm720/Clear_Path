@@ -18,7 +18,7 @@ const buildGraph = async () => {
     console.log('Fetching OSM data from Overpass API (this may take a minute)...');
     const query = `
       [out:json][timeout:90];
-      way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential"](${BENGALURU_BBOX});
+      way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|footway|path|pedestrian|living_street"](${BENGALURU_BBOX});
       (._;>;);
       out body;
     `;
@@ -83,17 +83,25 @@ const buildGraph = async () => {
 
           const weight = dist * (1 + (aqi / 100));
 
+          const tags = way.tags || {};
+          const oneway = tags.oneway;
+          const highwayType = tags.highway || 'unclassified';
+
+          const isOneWayForward = oneway === 'yes' || oneway === 'true' || oneway === '1';
+          const isOneWayReverse = oneway === '-1' || oneway === 'reverse';
+
+          // Pedestrians ignore oneway restrictions
+          const isFootWay = highwayType === 'footway' || highwayType === 'path' || highwayType === 'pedestrian';
+
           if (!graph[uId]) graph[uId] = { lat: u.lat, lon: u.lon, neighbors: [] };
           if (!graph[vId]) graph[vId] = { lat: v.lat, lon: v.lon, neighbors: [] };
 
-          if (!isOneWayReverse) {
-            // Forward edge: u -> v (always added unless oneway=-1)
-            graph[uId].neighbors.push({ to: vId, dist, weight, aqi });
+          if (!isOneWayReverse || isFootWay) {
+            graph[uId].neighbors.push({ to: vId, dist, weight, aqi, highway: highwayType });
           }
 
-          if (!isOneWayForward) {
-            // Reverse edge: v -> u (only added if road is not one-way forward)
-            graph[vId].neighbors.push({ to: uId, dist, weight, aqi });
+          if (!isOneWayForward || isFootWay) {
+            graph[vId].neighbors.push({ to: uId, dist, weight, aqi, highway: highwayType });
           }
         }
       }
