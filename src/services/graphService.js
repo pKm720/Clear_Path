@@ -57,8 +57,16 @@ const buildGraph = async () => {
 
     const graph = {};
 
-    // Build adjacency list
+    // Build adjacency list respecting one-way restrictions
     for (const way of ways) {
+      const tags = way.tags || {};
+      const oneway = tags.oneway;
+
+      // oneway=yes or oneway=true: only u->v allowed
+      // oneway=-1 or oneway=reverse: only v->u allowed
+      const isOneWayForward = oneway === 'yes' || oneway === 'true' || oneway === '1';
+      const isOneWayReverse = oneway === '-1' || oneway === 'reverse';
+
       for (let i = 0; i < way.nodes.length - 1; i++) {
         const uId = way.nodes[i];
         const vId = way.nodes[i + 1];
@@ -69,20 +77,24 @@ const buildGraph = async () => {
         if (u && v) {
           const dist = haversineDistance(u.lat, u.lon, v.lat, v.lon);
 
-          // Interpolate AQI at the midpoint of the edge
           const midLat = (u.lat + v.lat) / 2;
           const midLon = (u.lon + v.lon) / 2;
           const aqi = await calculateAQIForPoint(midLat, midLon, sensors);
 
-          // Weight = distance * (1 + (aqi / 100))
-          // This scales weight: higher AQI = higher penalty
           const weight = dist * (1 + (aqi / 100));
 
           if (!graph[uId]) graph[uId] = { lat: u.lat, lon: u.lon, neighbors: [] };
           if (!graph[vId]) graph[vId] = { lat: v.lat, lon: v.lon, neighbors: [] };
 
-          graph[uId].neighbors.push({ to: vId, dist, weight, aqi });
-          graph[vId].neighbors.push({ to: uId, dist, weight, aqi }); // Assuming undirected for now
+          if (!isOneWayReverse) {
+            // Forward edge: u -> v (always added unless oneway=-1)
+            graph[uId].neighbors.push({ to: vId, dist, weight, aqi });
+          }
+
+          if (!isOneWayForward) {
+            // Reverse edge: v -> u (only added if road is not one-way forward)
+            graph[vId].neighbors.push({ to: uId, dist, weight, aqi });
+          }
         }
       }
     }

@@ -223,7 +223,7 @@ const getRoutes = async (startCoord, endCoord) => {
           mode,
           path: path.map(p => ({ lat: p.lat, lon: p.lon })), 
           distance: parseFloat(totalDist.toFixed(2)),
-          duration: Math.round(totalDist * 3), 
+          duration: Math.round((totalDist / 30) * 60), // Minutes at 30 km/h avg city speed
           avgAQI: edgeCount > 0 ? Math.round(totalAQI / edgeCount) : 0,
           healthScore: mode === 'cleanest' ? 100 : (mode === 'balanced' ? 80 : 60)
         });
