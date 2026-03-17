@@ -18,52 +18,46 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Calculates the estimated AQI at a specific lat/lng using
+ * Calculates the estimated AQI at a specific lat/lon using
  * Inverse Distance Weighting (IDW) interpolation.
  * 
  * @param {Number} targetLat 
- * @param {Number} targetLng 
+ * @param {Number} targetLon 
+ * @param {Array} preFetchedSensors Optional array of sensor readings
  * @param {Number} power The 'p' parameter in IDW (default 2)
  * @returns {Number} Estimated AQI
  */
-const calculateAQIForPoint = async (targetLat, targetLng, power = 2) => {
+const calculateAQIForPoint = async (targetLat, targetLon, preFetchedSensors = null, power = 2) => {
   try {
-    // 1. Fetch all latest sensor readings from DB
-    // Only want aqi > 0 to avoid breaking math with missing data
-    const sensors = await SensorReading.find({ aqi: { $gt: 0 } });
+    // DB fetch only if sensors not provided
+    const sensors = preFetchedSensors || await SensorReading.find({ aqi: { $gt: 0 } });
 
     if (!sensors || sensors.length === 0) {
-      // Fallback if no sensor data is available
-      return 50; // Return a default 'good' or 'moderate' AQI depending on  baseline
+      return 50; 
     }
 
     let numerator = 0;
     let denominator = 0;
 
     for (const sensor of sensors) {
-      const distance = haversineDistance(targetLat, targetLng, sensor.lat, sensor.lng);
+      const distance = haversineDistance(targetLat, targetLon, sensor.lat, sensor.lng);
 
-      /**
-       * If one of the given points are exactly on a sensor, return its exact reading
-       */
       if (distance < 0.001) {
         return sensor.aqi;
       }
 
-      // Inverse Distance Weighting formula calculation
       const weight = 1 / Math.pow(distance, power);
       numerator += weight * sensor.aqi;
       denominator += weight;
     }
 
-    if (denominator === 0) return 50; // Avoid DivByZero
+    if (denominator === 0) return 50;
 
-    const estimatedAQI = Math.round(numerator / denominator);
-    return estimatedAQI;
+    return Math.round(numerator / denominator);
 
   } catch (error) {
     console.error('Interpolation Error:', error.message);
-    return 50; // Safe fallback
+    return 50;
   }
 };
 

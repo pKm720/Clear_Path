@@ -29,7 +29,7 @@ function reconstructPath(parents, endNodeId, nodes) {
 
   while (currentId !== null) {
     const node = nodes[currentId];
-    path.unshift({ lat: node.lat, lng: node.lon });
+    path.unshift({ lat: node.lat, lon: node.lon });
     currentId = parents[currentId];
   }
 
@@ -121,8 +121,11 @@ const getRoutes = async (startCoord, endCoord) => {
     const graph = JSON.parse(graphData);
 
     console.log('Finding nearest nodes for start and destination...');
-    const startNodeId = findNearestNode(startCoord.lat, startCoord.lng, graph);
-    const endNodeId = findNearestNode(endCoord.lat, endCoord.lng, graph);
+    const startLon = startCoord.lon || startCoord.lng;
+    const endLon = endCoord.lon || endCoord.lng;
+    
+    const startNodeId = findNearestNode(startCoord.lat, startLon, graph);
+    const endNodeId = findNearestNode(endCoord.lat, endLon, graph);
 
     if (!startNodeId || !endNodeId) {
       throw new Error('Could not map coordinates to graph nodes.');
@@ -135,25 +138,33 @@ const getRoutes = async (startCoord, endCoord) => {
     for (const mode of modes) {
       const path = await findPath(startNodeId, endNodeId, graph, mode);
       if (path) {
-        // Calculate route statistics
         let totalDist = 0;
         let totalAQI = 0;
-        let count = 0;
+        let edgeCount = 0;
 
         for (let i = 0; i < path.length - 1; i++) {
-          const u = path[i];
-          const v = path[i+1];
-          // Find matching edge for stats (approximation for performance)
-          // In production, we'd store edge indices for exact lookups
-          totalDist += haversineDistance(u.lat, u.lng, v.lat, v.lng);
+          const uId = findNearestNode(path[i].lat, path[i].lon, graph);
+          const vNext = path[i+1];
+          
+          const node = graph[uId];
+          const edge = node.neighbors.find(n => 
+            Math.abs(graph[n.to].lat - vNext.lat) < 0.0001 && 
+            Math.abs(graph[n.to].lon - vNext.lon) < 0.0001
+          );
+
+          if (edge) {
+            totalDist += edge.dist;
+            totalAQI += edge.aqi;
+            edgeCount++;
+          }
         }
 
         routes.push({
           mode,
           path,
           distance: parseFloat(totalDist.toFixed(2)),
-          duration: Math.round(totalDist * 3), // Rough estimation: 3 mins per KM
-          avgAQI: 0, // Computed at runtime in actual routing
+          duration: Math.round(totalDist * 3), // Estimation
+          avgAQI: edgeCount > 0 ? Math.round(totalAQI / edgeCount) : 0,
           healthScore: mode === 'cleanest' ? 100 : (mode === 'balanced' ? 80 : 60)
         });
       }

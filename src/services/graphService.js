@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { redisClient } = require('../config/db');
+const SensorReading = require('../models/SensorReading');
 const { calculateAQIForPoint, haversineDistance } = require('./interpolationService');
 
 const BENGALURU_BBOX = '12.8,77.4,13.2,77.8';
@@ -10,6 +11,9 @@ const BENGALURU_BBOX = '12.8,77.4,13.2,77.8';
  */
 const buildGraph = async () => {
   try {
+    // Pre-fetch sensors for interpolation to avoid N+1 query problem
+    const sensors = await SensorReading.find({ aqi: { $gt: 0 } });
+    
     console.log('Fetching OSM data from Overpass API...');
     const query = `
       [out:json];
@@ -51,7 +55,7 @@ const buildGraph = async () => {
           // Interpolate AQI at the midpoint of the edge
           const midLat = (u.lat + v.lat) / 2;
           const midLon = (u.lon + v.lon) / 2;
-          const aqi = await calculateAQIForPoint(midLat, midLon);
+          const aqi = await calculateAQIForPoint(midLat, midLon, sensors);
 
           // Weight = distance * (1 + (aqi / 100))
           // This scales weight: higher AQI = higher penalty

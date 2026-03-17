@@ -6,12 +6,16 @@ const { startAQIPoller } = require('./src/jobs/aqiPoller');
 const aqiRoutes = require('./src/routes/aqi');
 const routeRoutes = require('./src/routes/route');
 const errorHandler = require('./src/middleware/errorHandler');
+const { apiLimiter } = require('./src/middleware/rateLimiter');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(cors());
 app.use(express.json());
+
+// Global Rate Limiter
+app.use('/api/', apiLimiter);
 
 // Connect to Databases
 connectDB();
