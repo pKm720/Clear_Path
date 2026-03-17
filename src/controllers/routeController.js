@@ -6,7 +6,7 @@ const { getRoutes } = require('../services/routingService');
 function isValidCoord(coord) {
   return coord && 
          typeof coord.lat === 'number' && 
-         typeof coord.lng === 'number';
+         (typeof coord.lng === 'number' || typeof coord.lon === 'number');
 }
 
 /**
@@ -17,7 +17,7 @@ const calculateRoute = async (req, res) => {
 
   if (!isValidCoord(start) || !isValidCoord(end)) {
     return res.status(400).json({ 
-      error: 'Invalid coordinates. Required format: { lat: number, lng: number }' 
+      error: 'Invalid coordinates. Required format: { lat: number, lon: number } or { lat: number, lng: number }' 
     });
   }
 

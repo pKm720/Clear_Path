@@ -7,6 +7,8 @@ const aqiRoutes = require('./src/routes/aqi');
 const routeRoutes = require('./src/routes/route');
 const errorHandler = require('./src/middleware/errorHandler');
 const { apiLimiter } = require('./src/middleware/rateLimiter');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./src/config/swagger');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -27,6 +29,9 @@ startAQIPoller();
 // Routes
 app.use('/api/aqi', aqiRoutes);
 app.use('/api/route', routeRoutes);
+
+// API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -2,6 +2,7 @@ const axios = require('axios');
 const { redisClient } = require('../config/db');
 const SensorReading = require('../models/SensorReading');
 const { calculateAQIForPoint, haversineDistance } = require('./interpolationService');
+const { clearCache } = require('./routingService');
 
 const BENGALURU_BBOX = '12.8,77.4,13.2,77.8';
 
@@ -13,15 +14,31 @@ const buildGraph = async () => {
   try {
     // Pre-fetch sensors for interpolation to avoid N+1 query problem
     const sensors = await SensorReading.find({ aqi: { $gt: 0 } });
-    
-    console.log('Fetching OSM data from Overpass API...');
+
+    console.log('Fetching OSM data from Overpass API (this may take a minute)...');
     const query = `
-      [out:json];
+      [out:json][timeout:90];
       way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential"](${BENGALURU_BBOX});
       (._;>;);
       out body;
     `;
-    const response = await axios.post('https://overpass-api.de/api/interpreter', `data=${encodeURIComponent(query)}`);
+
+    let response;
+    let retries = 3;
+
+    while (retries > 0) {
+      try {
+        response = await axios.post('https://overpass-api.de/api/interpreter', `data=${encodeURIComponent(query)}`, {
+          timeout: 120000 // 2 minute timeout for large responses
+        });
+        break; // Success
+      } catch (err) {
+        retries--;
+        console.warn(`Overpass attempt failed. Retries left: ${retries}`);
+        if (retries === 0) throw err;
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s before retry
+      }
+    }
 
     const elements = response.data.elements;
     const nodes = {};
@@ -74,6 +91,7 @@ const buildGraph = async () => {
     // Store the graph as a single JSON for now. 
     // In V2, might shard this or use a graph DB.
     await redisClient.set('bengaluru_graph', JSON.stringify(graph));
+    clearCache(); // Invalidate in-memory routing cache
 
     console.log('Graph successfully built and stored in Redis!');
     return true;
