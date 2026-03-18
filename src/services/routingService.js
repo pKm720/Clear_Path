@@ -294,4 +294,71 @@ const clearCache = () => {
   console.log('Routing graph cache invalidated.');
 };
 
-module.exports = { getRoutes, clearCache };
+/**
+ * Snaps a coordinate to the nearest point on a path polyline.
+ * Returns the snapped coordinate, corresponding path index, and remaining distance.
+ */
+function snapToPath(currentCoord, path) {
+  if (!path || path.length < 2) return null;
+
+  let minDistance = Infinity;
+  let snappedPoint = null;
+  let segmentIndex = 0;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const p1 = path[i];
+    const p2 = path[i + 1];
+
+    // Find the point on line segment (p1, p2) closest to currentCoord
+    const point = getClosestPointOnSegment(currentCoord, p1, p2);
+    const dist = haversineDistance(currentCoord.lat, currentCoord.lon || currentCoord.lng, point.lat, point.lon);
+
+    if (dist < minDistance) {
+      minDistance = dist;
+      snappedPoint = point;
+      segmentIndex = i;
+    }
+  }
+
+  // Calculate remaining distance from snapped point to end
+  let remainingDist = haversineDistance(snappedPoint.lat, snappedPoint.lon, path[segmentIndex + 1].lat, path[segmentIndex + 1].lon);
+  for (let i = segmentIndex + 1; i < path.length - 1; i++) {
+    remainingDist += haversineDistance(path[i].lat, path[i].lon, path[i + 1].lat, path[i + 1].lon);
+  }
+
+  return {
+    snappedPoint,
+    distanceFromPath: minDistance, // How many km away the user is from the line
+    remainingDistance: parseFloat(remainingDist.toFixed(2)),
+    segmentIndex
+  };
+}
+
+/**
+ * Geometric helper to find the closest point on a line segment.
+ */
+function getClosestPointOnSegment(p, a, b) {
+  const cLat = p.lat;
+  const cLon = p.lon || p.lng;
+  
+  const vX = b.lat - a.lat;
+  const vY = b.lon - a.lon;
+  const wX = cLat - a.lat;
+  const wY = cLon - a.lon;
+
+  const dot = wX * vX + wY * vY;
+  const magSq = vX * vX + vY * vY;
+
+  if (magSq === 0) return a;
+
+  let t = dot / magSq;
+  if (t < 0) return a;
+  if (t > 1) return b;
+
+  return {
+    lat: a.lat + t * vX,
+    lon: a.lon + t * vY
+  };
+}
+
+module.exports = { getRoutes, clearCache, snapToPath };

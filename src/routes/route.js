@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { calculateRoute } = require('../controllers/routeController');
+const { calculateRoute, snapToRoute } = require('../controllers/routeController');
 
 /**
  * @openapi
@@ -36,5 +36,37 @@ const { calculateRoute } = require('../controllers/routeController');
  *         description: Array of calculated routes (cleanest, balanced, fastest) with stats.
  */
 router.post('/', calculateRoute);
+
+/**
+ * @openapi
+ * /api/route/snap:
+ *   post:
+ *     summary: Snap current GPS position to the nearest point on a route
+ *     description: Used during navigation to handle GPS drift and calculate remaining distance.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [current, path]
+ *             properties:
+ *               current:
+ *                 type: object
+ *                 properties:
+ *                   lat: { type: number, example: 12.9100 }
+ *                   lon: { type: number, example: 77.5670 }
+ *               path:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     lat: { type: number }
+ *                     lon: { type: number }
+ *     responses:
+ *       200:
+ *         description: Snapped coordinate and remaining distance to destination.
+ */
+router.post('/snap', snapToRoute);
 
 module.exports = router;

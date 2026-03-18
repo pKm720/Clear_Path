@@ -1,4 +1,4 @@
-const { getRoutes } = require('../services/routingService');
+const { getRoutes, snapToPath } = require('../services/routingService');
 
 const VALID_TRANSPORT_MODES = ['car', 'motorbike', 'pedestrian'];
 
@@ -32,4 +32,27 @@ const calculateRoute = async (req, res) => {
   }
 };
 
-module.exports = { calculateRoute };
+const snapToRoute = async (req, res) => {
+  const { current, path } = req.body;
+
+  if (!isValidCoord(current)) {
+    return res.status(400).json({ error: 'Invalid current coordinates.' });
+  }
+
+  if (!path || !Array.isArray(path) || path.length < 2) {
+    return res.status(400).json({ error: 'Valid path (array of coords) is required.' });
+  }
+
+  try {
+    const result = snapToPath(current, path);
+    if (!result) {
+      return res.status(500).json({ error: 'Failed to snap point to path.' });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('Snap controller error:', error.message);
+    res.status(500).json({ error: 'Failed to process snap request.' });
+  }
+};
+
+module.exports = { calculateRoute, snapToRoute };
