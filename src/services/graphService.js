@@ -83,12 +83,7 @@ const buildGraph = async () => {
 
           const weight = dist * (1 + (aqi / 100));
 
-          const tags = way.tags || {};
-          const oneway = tags.oneway;
           const highwayType = tags.highway || 'unclassified';
-
-          const isOneWayForward = oneway === 'yes' || oneway === 'true' || oneway === '1';
-          const isOneWayReverse = oneway === '-1' || oneway === 'reverse';
 
           // Pedestrians ignore oneway restrictions
           const isFootWay = highwayType === 'footway' || highwayType === 'path' || highwayType === 'pedestrian';
