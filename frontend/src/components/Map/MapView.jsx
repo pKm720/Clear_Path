@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAllSensors } from '../../services/api';
 import { useRouteStore } from '../../store/routeStore';
+import { getDistance } from '../../utils/geo';
 
 const Style = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
@@ -13,7 +14,10 @@ const MapView = () => {
   const [errorMessage, setErrorMessage] = useState(null);
   
   // Store hocks
-  const { routes, selectedRouteIndex, showHeatmap } = useRouteStore();
+  const { 
+    routes, selectedRouteIndex, showHeatmap, 
+    currentPosition, isNavigating 
+  } = useRouteStore();
 
   // Fetch all sensors for the heatmap
   const { data: sensorData } = useQuery({
@@ -24,7 +28,6 @@ const MapView = () => {
 
   useEffect(() => {
     if (map.current) return;
-
     try {
       map.current = new maplibregl.Map({
         container: mapContainer.current,
@@ -97,18 +100,113 @@ const MapView = () => {
             'circle-stroke-color': 'white'
           }
         });
+
+        // 5. User Location Layer (Raw GPS - Small Indicator)
+        map.current.addSource('user-location', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.current.addLayer({
+          id: 'user-marker',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': 4,
+            'circle-color': 'white',
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#3b82f6',
+            'circle-opacity': 0.8
+          }
+        });
+
+        // 6. Snapped Navigation Arrow (Primary Indicator)
+        map.current.addSource('snapped-location', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.current.addLayer({
+          id: 'nav-arrow',
+          type: 'symbol',
+          source: 'snapped-location',
+          layout: {
+            'text-field': '▲', // Directional Arrow
+            'text-size': 24,
+            'text-rotate': ['get', 'bearing'],
+            'text-rotation-alignment': 'map',
+            'text-allow-overlap': true,
+            'text-anchor': 'center'
+          },
+          paint: {
+            'text-color': '#3b82f6',
+            'text-halo-color': 'white',
+            'text-halo-width': 3
+          }
+        });
       });
     } catch (err) {
       setErrorMessage(`Init Error: ${err.message}`);
     }
-
-    return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-    };
   }, []);
+
+  // Snap-to-Route Helper
+  const getSnappedPoint = (pos, path) => {
+    if (!path || path.length < 2) return pos;
+    let minD = Infinity;
+    let snapped = pos;
+    let bearing = 0;
+
+    for (let i = 0; i < path.length - 1; i++) {
+        const p1 = path[i];
+        const p2 = path[i+1];
+        // For simplicity in a web-demo, find nearest node. 
+        // Real snapping would project onto segment, but node-snapping is safe for now.
+        const d = getDistance(pos.lat, pos.lon, p1.lat, p1.lon);
+        if (d < minD) {
+            minD = d;
+            snapped = p1;
+            // Simple bearing calculation
+            bearing = Math.atan2(p2.lon - p1.lon, p2.lat - p1.lat) * 180 / Math.PI;
+        }
+    }
+    return { ...snapped, bearing, distance: minD };
+  };
+
+  // Update User Location visually
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !currentPosition) return;
+    
+    const rawSource = map.current.getSource('user-location');
+    const snapSource = map.current.getSource('snapped-location');
+    const currentRoute = routes[selectedRouteIndex];
+
+    if (rawSource) {
+      rawSource.setData({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [currentPosition.lon, currentPosition.lat] }
+      });
+    }
+
+    if (snapSource && isNavigating && currentRoute?.path) {
+      const snap = getSnappedPoint(currentPosition, currentRoute.path);
+      
+      // Only snap if within 30 meters, else user is truly off-route
+      const finalPos = snap.distance < 30 ? [snap.lon, snap.lat] : [currentPosition.lon, currentPosition.lat];
+      
+      snapSource.setData({
+        type: 'Feature',
+        properties: { bearing: snap.bearing },
+        geometry: { type: 'Point', coordinates: finalPos }
+      });
+
+      map.current.easeTo({
+        center: finalPos,
+        zoom: 17,
+        pitch: 60,
+        bearing: snap.distance < 30 ? snap.bearing : 0,
+        duration: 1000
+      });
+    }
+  }, [currentPosition, isNavigating, mapLoaded, routes, selectedRouteIndex]);
 
   // Update Route Visually
   useEffect(() => {

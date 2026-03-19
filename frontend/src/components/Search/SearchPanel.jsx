@@ -2,41 +2,24 @@ import React from 'react';
 import { useRouteStore } from '../../store/routeStore';
 import LocationInput from './LocationInput';
 import TransportToggle from './TransportToggle';
-import { fetchRoutes } from '../../services/api';
 
 const SearchPanel = () => {
   const { 
     startCoord, setStartCoord, 
     endCoord, setEndCoord, 
     transportMode, setTransportMode,
-    setRoutes, setIsLoading, setError,
+    calculateRoutes,
     showHeatmap, setShowHeatmap,
-    routes
+    routes, setIsNavigating, isNavigating
   } = useRouteStore();
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     if (!startCoord || !endCoord) return;
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetchRoutes(
-        { lat: startCoord.lat, lon: startCoord.lon },
-        { lat: endCoord.lat, lon: endCoord.lon },
-        transportMode
-      );
-      
-      if (response.data && response.data.routes) {
-        setRoutes(response.data.routes);
-      } else {
-        throw new Error('No routes found between these locations.');
-      }
-    } catch (err) {
-      console.error('Route search failed:', err);
-      setError(err.response?.data?.error || err.message);
-    } finally {
-      setIsLoading(false);
-    }
+    calculateRoutes(
+      { lat: startCoord.lat, lon: startCoord.lon },
+      { lat: endCoord.lat, lon: endCoord.lon },
+      transportMode
+    );
   };
 
   const isReady = startCoord && endCoord;
@@ -107,6 +90,15 @@ const SearchPanel = () => {
         >
           {isReady ? 'Calculate Path' : 'Select Locations'}
         </button>
+
+        {routes.length > 0 && (
+          <button
+            onClick={() => setIsNavigating(true)}
+            className="w-full p-3 rounded-xl font-black text-white text-xs bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 uppercase tracking-widest mt-1 transition-all active:scale-95 animate-in fade-in zoom-in-95 duration-300"
+          >
+            Start Trip
+          </button>
+        )}
       </div>
     </div>
   );

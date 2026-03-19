@@ -1,13 +1,59 @@
+import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useRouteStore } from './store/routeStore';
+import { useGeolocation } from './hooks/useGeolocation';
+import { getDistanceFromPath, getDistance } from './utils/geo';
 import MapView from './components/Map/MapView';
 import SearchPanel from './components/Search/SearchPanel';
 import RouteResults from './components/Result/RouteResults';
+import NavDashboard from './components/Navigation/NavDashboard';
+import ArrivalSummary from './components/Result/ArrivalSummary';
 
 const queryClient = new QueryClient();
 
 function App() {
-  const { isNavigating, isLoading, error } = useRouteStore();
+  useGeolocation();
+  const { 
+    isNavigating, isArrived, isLoading, error,
+    currentPosition, routes, selectedRouteIndex,
+    calculateRoutes, transportMode, endCoord,
+    autoReroute, setIsNavigating, setIsArrived,
+    setTripSummary
+  } = useRouteStore();
+
+  // Dynamic Rerouting & Arrival Logic
+  useEffect(() => {
+    if (!isNavigating || !currentPosition || !routes.length || isLoading) return;
+
+    const currentRoute = routes[selectedRouteIndex];
+    if (!currentRoute?.path || !endCoord) return;
+
+    // 1. Check Arrival
+    const distToTarget = getDistance(currentPosition.lat, currentPosition.lon, endCoord.lat, endCoord.lon);
+    if (distToTarget < 30) {
+      console.log("Destination reached!");
+      setTripSummary({
+        totalKm: currentRoute.distance,
+        avgAQI: currentRoute.avgAQI,
+        healthBenefit: "34% less exposure"
+      });
+      setIsNavigating(false);
+      setIsArrived(true);
+      return;
+    }
+
+    // 2. Check Drift for Rerouting
+    if (!autoReroute) return;
+    const drift = getDistanceFromPath(currentPosition, currentRoute.path);
+    if (drift > 50) {
+      console.log(`Drift detected: ${drift.toFixed(1)}m. Rerouting...`);
+      calculateRoutes(
+        { lat: currentPosition.lat, lon: currentPosition.lon },
+        endCoord,
+        transportMode
+      );
+    }
+  }, [currentPosition, isNavigating, routes, selectedRouteIndex, autoReroute]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -67,6 +113,12 @@ function App() {
             </div>
           )}
         </div>
+
+        {/* Navigation Dashboard (Mobile-style bottom overlay) */}
+        {isNavigating && <NavDashboard />}
+
+        {/* Arrival Success Summary */}
+        {isArrived && <ArrivalSummary />}
       </div>
     </QueryClientProvider>
   );
