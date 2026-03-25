@@ -2,10 +2,10 @@ const mongoose = require('mongoose');
 
 const sensorReadingSchema = new mongoose.Schema({
   uid: { 
-    type: Number, 
+    type: String, 
     required: true,
     index: true 
-  }, // WAQI station ID
+  }, // Unified prefix station ID (e.g. waqi_123 or openaq_abc)
   lat: { 
     type: Number, 
     required: true 

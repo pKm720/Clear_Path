@@ -8,6 +8,7 @@ import SearchPanel from './components/Search/SearchPanel';
 import RouteResults from './components/Result/RouteResults';
 import NavDashboard from './components/Navigation/NavDashboard';
 import ArrivalSummary from './components/Result/ArrivalSummary';
+import RouteSkeleton from './components/Result/RouteSkeleton';
 
 const queryClient = new QueryClient();
 
@@ -73,31 +74,26 @@ function App() {
           <MapView />
         </div>
 
-        {/* UI Overlay */}
+        {/* UI Overlay - Responsive Sidebar/Bottom-Sheet */}
         <div 
-          style={{
-            position: 'absolute',
-            top: '16px',
-            left: '16px',
-            zIndex: 10,
-            width: '280px', // Ultra-compact width
-            maxHeight: 'calc(100vh - 32px)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            opacity: isNavigating ? 0 : 1,
-            transform: isNavigating ? 'translateX(-120%)' : 'translateX(0)'
-          }}
+          className={`
+            absolute z-10 flex flex-col gap-3 transition-all duration-500 ease-in-out
+            /* Desktop Styles */
+            md:top-4 md:left-4 md:w-[280px] md:max-h-[calc(100vh-32px)]
+            /* Mobile Styles (Bottom Sheet-ish) */
+            bottom-4 left-4 right-4 md:bottom-auto
+            ${isNavigating ? 'opacity-0 -translate-x-full pointer-events-none' : 'opacity-100 translate-x-0'}
+          `}
         >
           <SearchPanel />
           <RouteResults />
 
-          {/* Loading State Overlay */}
+          {/* Step 8: Route Skeletons */}
           {isLoading && (
-            <div className="mt-4 bg-white/80 backdrop-blur-md p-4 rounded-3xl shadow-xl flex items-center gap-4 border border-white/20">
-              <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm font-bold text-gray-700 tracking-tight uppercase">Calculating healthiest routes...</p>
+            <div className="flex flex-col gap-2 mt-2 animate-in fade-in duration-300">
+              <RouteSkeleton />
+              <RouteSkeleton />
+              <RouteSkeleton />
             </div>
           )}
 

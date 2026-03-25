@@ -59,11 +59,13 @@ function findNearestNode(lat, lon, nodes, transportMode) {
   let minDistance = Infinity;
 
   // Search surrounding grid cells, expanding radius if needed
-  for (let radius = 1; radius <= 5; radius++) {
+  // For the city-scale mock graph, we use a wider search radius to catch distant nodes
+  for (let radius = 1; radius <= 50; radius++) {
     for (let dx = -radius; dx <= radius; dx++) {
       for (let dy = -radius; dy <= radius; dy++) {
         if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue; // Only outer ring
-        const cellNodes = spatialIndex[`${gridX + dx},${gridY + dy}`] || [];
+        const key = `${gridX + dx},${gridY + dy}`;
+        const cellNodes = spatialIndex[key] || [];
         for (const nodeId of cellNodes) {
           const node = nodes[nodeId];
           // For transport-aware search, require at least one accessible neighbor

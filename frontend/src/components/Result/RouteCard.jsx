@@ -1,6 +1,6 @@
 import React from 'react';
 
-const RouteCard = ({ route, index, isSelected, onClick, modes = [] }) => {
+const RouteCard = ({ route, index, isSelected, onClick, modes = [], benefit = 0 }) => {
   const { distance, avgAQI, duration } = route;
   
   const distanceKm = parseFloat(distance).toFixed(1);
@@ -43,6 +43,11 @@ const RouteCard = ({ route, index, isSelected, onClick, modes = [] }) => {
             <span className="text-lg font-black text-gray-900">{timeMins} min</span>
             <span className="text-[8px] font-bold text-gray-400 uppercase">{distanceKm} KM</span>
           </div>
+          {benefit > 0 && (
+            <p className="text-[8px] font-black text-green-600 uppercase tracking-tight mt-0.5 animate-pulse">
+              ~{benefit}% Less Exposure
+            </p>
+          )}
         </div>
         
         <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>

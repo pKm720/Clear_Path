@@ -99,6 +99,10 @@ const SearchPanel = () => {
             Start Trip
           </button>
         )}
+
+        <p className="text-[7px] font-medium text-gray-400 text-center pt-2 leading-tight px-4">
+          Estimates based on government sensors + road classification. Street-level AQI may vary.
+        </p>
       </div>
     </div>
   );

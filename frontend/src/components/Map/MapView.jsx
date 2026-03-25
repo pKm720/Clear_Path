@@ -74,13 +74,14 @@ const MapView = () => {
             'heatmap-color': [
               'interpolate', ['linear'], ['heatmap-density'],
               0, 'rgba(0, 255, 0, 0)',
-              0.2, 'rgba(0, 255, 0, 0.5)',
-              0.4, 'rgba(255, 255, 0, 0.5)',
-              0.6, 'rgba(255, 165, 0, 0.5)',
-              1, 'rgba(255, 0, 0, 0.8)'
+              0.2, '#2563eb', // Blue
+              0.4, '#22c55e', // Green
+              0.6, '#eab308', // Yellow
+              0.8, '#f97316', // Orange
+              1, '#dc2626'    // Red
             ],
             'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 20, 15, 60],
-            'heatmap-opacity': 0.7
+            'heatmap-opacity': 0.6
           }
         });
 
@@ -224,6 +225,23 @@ const MapView = () => {
       
       const bounds = coords.reduce((acc, coord) => acc.extend(coord), new maplibregl.LngLatBounds(coords[0], coords[0]));
       map.current.fitBounds(bounds, { padding: 100, duration: 1000 });
+
+      // Step 8: Route Draw Animation
+      let step = 0;
+      const animateLine = () => {
+        if (!map.current) return;
+        step += 0.05;
+        if (step <= 1) {
+          map.current.setPaintProperty('route-line', 'line-dasharray', [step, 1]);
+          requestAnimationFrame(animateLine);
+        } else {
+          map.current.setPaintProperty('route-line', 'line-dasharray', [1, 0]);
+        }
+      };
+      
+      // Reset before animation
+      map.current.setPaintProperty('route-line', 'line-dasharray', [0, 1]);
+      animateLine();
     }
   }, [routes, selectedRouteIndex, mapLoaded]);
 

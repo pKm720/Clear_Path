@@ -26,12 +26,22 @@ const RouteResults = () => {
 
   const displayRoutes = Object.values(uniqueRoutes);
 
+  // Identify Fastest AQI for comparison (Step 8 of roadmap)
+  const fastestRoute = validRoutes.find(r => r.mode === 'fastest');
+  const fastestAQI = fastestRoute?.avgAQI || 0;
+
   return (
     <div className="mt-2 flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-6 duration-500 overflow-y-auto max-h-[calc(100vh-320px)] pr-1 custom-scrollbar">
       {displayRoutes.map((route, idx) => {
-        // Find which ORGINAL index in the 'routes' array this display route corresponds to
+        // Find which ORIGINAL index in the 'routes' array this display route corresponds to
         const originalIndex = routes.findIndex(r => r.mode === route.modes[0]);
         
+        // Calculate health benefit relative to fastest route
+        let benefit = 0;
+        if (fastestAQI > 0 && route.avgAQI < fastestAQI) {
+          benefit = Math.round(((fastestAQI - route.avgAQI) / fastestAQI) * 100);
+        }
+
         return (
           <RouteCard
             key={idx}
@@ -39,6 +49,7 @@ const RouteResults = () => {
             route={route}
             modes={route.modes} 
             isSelected={selectedRouteIndex === originalIndex}
+            benefit={benefit}
             onClick={() => setSelectedRouteIndex(originalIndex)}
           />
         );
