@@ -10,6 +10,7 @@ const SearchPanel = () => {
     transportMode, setTransportMode,
     calculateRoutes,
     showHeatmap, setShowHeatmap,
+    is3D, toggle3D,
     routes, setIsNavigating, isNavigating
   } = useRouteStore();
 
@@ -25,7 +26,7 @@ const SearchPanel = () => {
   const isReady = startCoord && endCoord;
 
   return (
-    <div className="bg-white/95 backdrop-blur-xl p-3 rounded-2xl shadow-xl border border-white/20 flex flex-col gap-3">
+    <div className="relative z-50 bg-white/95 backdrop-blur-xl p-3 rounded-2xl shadow-xl border border-white/20 flex flex-col gap-3">
       <div className="flex justify-between items-center px-1">
         <h1 className="text-base font-black text-gray-900 tracking-tighter">ClearPath</h1>
         
@@ -38,6 +39,18 @@ const SearchPanel = () => {
               Clear
             </button>
           )}
+          
+          <button
+            onClick={toggle3D}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-300 text-[8px] font-black uppercase tracking-widest ${
+              is3D 
+                ? 'bg-indigo-500 border-indigo-400 text-white shadow-sm' 
+                : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'
+            }`}
+          >
+            {is3D ? '3D' : '2D'}
+          </button>
+
           <button
             onClick={() => setShowHeatmap(!showHeatmap)}
             className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-300 text-[8px] font-black uppercase tracking-widest ${

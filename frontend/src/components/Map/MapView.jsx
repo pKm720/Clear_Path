@@ -16,7 +16,7 @@ const MapView = () => {
   // Store hocks
   const { 
     routes, selectedRouteIndex, showHeatmap, 
-    currentPosition, isNavigating 
+    currentPosition, isNavigating, is3D
   } = useRouteStore();
 
   // Fetch all sensors for the heatmap
@@ -69,19 +69,22 @@ const MapView = () => {
           source: 'sensors',
           layout: { 'visibility': 'none' },
           paint: {
-            'heatmap-weight': ['interpolate', ['linear'], ['get', 'aqi'], 0, 0, 150, 1],
-            'heatmap-intensity': 1,
+            // Give even clean nodes a base weight of 0.5 so they always have a strong aura
+            'heatmap-weight': ['interpolate', ['linear'], ['get', 'aqi'], 0, 0.5, 150, 1.5],
+            // High intensity forces the separate blobs to merge into a continuous map
+            'heatmap-intensity': 3.0,
             'heatmap-color': [
               'interpolate', ['linear'], ['heatmap-density'],
-              0, 'rgba(0, 255, 0, 0)',
-              0.2, '#2563eb', // Blue
-              0.4, '#22c55e', // Green
-              0.6, '#eab308', // Yellow
-              0.8, '#f97316', // Orange
-              1, '#dc2626'    // Red
+              0, 'rgba(37, 99, 235, 0)',  // Transparent BLUE base instead of green
+              0.2, '#2563eb',             // Blue Outer Glow
+              0.4, '#22c55e',             // Green
+              0.6, '#eab308',             // Yellow
+              0.8, '#f97316',             // Orange Core
+              1, '#dc2626'                // Red Core
             ],
-            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 20, 15, 60],
-            'heatmap-opacity': 0.6
+            // Massive radius to cover the entire city without zooming out
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 120, 10, 150, 15, 300],
+            'heatmap-opacity': 0.8
           }
         });
 
@@ -149,6 +152,15 @@ const MapView = () => {
     }
   }, []);
 
+  // Handle 2D/3D Toggle
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    map.current.easeTo({
+      pitch: is3D ? 60 : 0,
+      duration: 1000
+    });
+  }, [is3D, mapLoaded]);
+
   // Snap-to-Route Helper
   const getSnappedPoint = (pos, path) => {
     if (!path || path.length < 2) return pos;
@@ -202,8 +214,8 @@ const MapView = () => {
       map.current.easeTo({
         center: finalPos,
         zoom: 17,
-        pitch: 60,
-        bearing: snap.distance < 30 ? snap.bearing : 0,
+        pitch: is3D ? 60 : 0,
+        bearing: (snap.distance < 30 && is3D) ? snap.bearing : 0,
         duration: 1000
       });
     }
