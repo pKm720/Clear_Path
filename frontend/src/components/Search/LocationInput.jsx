@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
+const PHOTON_BASE = 'https://photon.komoot.io/api/';
 const BENGALURU_BBOX = '77.3,12.8,77.9,13.2'; // [minLon, minLat, maxLon, maxLat]
 
 const LocationInput = ({ placeholder, onSelect, value }) => {
@@ -23,24 +23,21 @@ const LocationInput = ({ placeholder, onSelect, value }) => {
   }, []);
 
   const searchLocations = async (text) => {
-    if (text.length < 3) {
+    if (text.length < 2) {
       setResults([]);
       return;
     }
 
     setIsSearching(true);
     try {
-      const response = await axios.get(NOMINATIM_BASE, {
+      const response = await axios.get(PHOTON_BASE, {
         params: {
-          q: `${text}, Bengaluru`,
-          format: 'json',
-          viewbox: BENGALURU_BBOX,
-          bounded: 1,
+          q: text,
+          bbox: BENGALURU_BBOX,
           limit: 5,
-          'accept-language': 'en'
         }
       });
-      setResults(response.data);
+      setResults(response.data.features || []);
       setShowDropdown(true);
     } catch (err) {
       console.error('Geocoding error:', err);
@@ -54,17 +51,20 @@ const LocationInput = ({ placeholder, onSelect, value }) => {
     setQuery(text);
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => searchLocations(text), 500);
+    timeoutRef.current = setTimeout(() => searchLocations(text), 300);
   };
 
-  const handleSelect = (res) => {
-    const label = res.display_name.split(',')[0];
-    setQuery(label);
+  const handleSelect = (feature) => {
+    const p = feature.properties;
+    const label = p.name || p.street || p.city;
+    const subtitle = [p.street, p.district, p.city].filter(Boolean).join(', ');
+    
+    setQuery(label); 
     setResults([]);
     setShowDropdown(false);
     onSelect({
-      lat: parseFloat(res.lat),
-      lon: parseFloat(res.lon),
+      lat: parseFloat(feature.geometry.coordinates[1]),
+      lon: parseFloat(feature.geometry.coordinates[0]),
       label: label
     });
   };
@@ -95,20 +95,28 @@ const LocationInput = ({ placeholder, onSelect, value }) => {
 
       {showDropdown && results.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-20">
-          {results.map((res) => (
-            <button
-              key={res.place_id}
-              onClick={() => handleSelect(res)}
-              className="w-full text-left p-4 hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors duration-150 group"
-            >
-              <p className="font-semibold text-gray-900 group-hover:text-blue-600 truncate">
-                {res.display_name.split(',')[0]}
-              </p>
-              <p className="text-sm text-gray-400 truncate mt-0.5">
-                {res.display_name.split(',').slice(1).join(',')}
-              </p>
-            </button>
-          ))}
+          {results.map((feature, idx) => {
+            const p = feature.properties;
+            const title = p.name || p.street || p.city;
+            const subtitle = [p.street, p.district, p.city, p.state].filter(Boolean).filter(s => s !== title).join(', ');
+            
+            return (
+              <button
+                key={p.osm_id || idx}
+                onClick={() => handleSelect(feature)}
+                className="w-full text-left p-4 hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors duration-150 group"
+              >
+                <p className="font-semibold text-gray-900 group-hover:text-blue-600 truncate">
+                  {title}
+                </p>
+                {subtitle && (
+                  <p className="text-sm text-gray-400 truncate mt-0.5">
+                    {subtitle}
+                  </p>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
