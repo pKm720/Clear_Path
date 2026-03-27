@@ -43,26 +43,13 @@ const MapView = () => {
         setMapLoaded(true);
         map.current.resize();
 
-        // 1. Initialise Route Source/Layer
-        map.current.addSource('route', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] }
-        });
-        map.current.addLayer({
-          id: 'route-line',
-          type: 'line',
-          source: 'route',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#2563eb', 'line-width': 6, 'line-opacity': 0.8 }
-        });
-
-        // 2. Initialise Heatmap Source
+        // 1. Initialise Heatmap Source
         map.current.addSource('sensors', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] }
         });
 
-        // 3. Add Heatmap Layer
+        // 2. Add Heatmap Layer
         map.current.addLayer({
           id: 'aqi-heat',
           type: 'heatmap',
@@ -88,7 +75,7 @@ const MapView = () => {
           }
         });
 
-        // 4. Add Point Layer for individual sensors
+        // 3. Add Point Layer for individual sensors
         map.current.addLayer({
           id: 'aqi-points',
           type: 'circle',
@@ -103,6 +90,30 @@ const MapView = () => {
             'circle-stroke-width': 2,
             'circle-stroke-color': 'white'
           }
+        });
+
+        // 4. Initialise Route Source/Layer ON TOP of the heatmap
+        map.current.addSource('route', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        
+        // Route casing (white highlight underneath the main blue line)
+        map.current.addLayer({
+          id: 'route-casing',
+          type: 'line',
+          source: 'route',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0.9, 'line-blur': 1 }
+        });
+
+        // Main Route line
+        map.current.addLayer({
+          id: 'route-line',
+          type: 'line',
+          source: 'route',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 1.0 }
         });
 
         // 5. User Location Layer (Raw GPS - Small Indicator)
@@ -245,14 +256,17 @@ const MapView = () => {
         step += 0.05;
         if (step <= 1) {
           map.current.setPaintProperty('route-line', 'line-dasharray', [step, 1]);
+          if (map.current.getLayer('route-casing')) map.current.setPaintProperty('route-casing', 'line-dasharray', [step, 1]);
           requestAnimationFrame(animateLine);
         } else {
           map.current.setPaintProperty('route-line', 'line-dasharray', [1, 0]);
+          if (map.current.getLayer('route-casing')) map.current.setPaintProperty('route-casing', 'line-dasharray', [1, 0]);
         }
       };
       
       // Reset before animation
       map.current.setPaintProperty('route-line', 'line-dasharray', [0, 1]);
+      if (map.current.getLayer('route-casing')) map.current.setPaintProperty('route-casing', 'line-dasharray', [0, 1]);
       animateLine();
     }
   }, [routes, selectedRouteIndex, mapLoaded]);

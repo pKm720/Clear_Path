@@ -11,53 +11,7 @@ const OVERPASS_MIRRORS = [
   'https://overpass.kumi.systems/api/interpreter'
 ];
 
-/**
- * Generates a minimal hardcoded graph for Indiranagar if Overpass is down.
- */
-const generateMockGraph = () => {
-  console.log('Building CITY-SCALE MOCK GRAPH (15km x 15km)...');
-  const graph = {};
-  // Center: ~Cubbon Park area. Spread: ~15km
-  const latStart = 12.900, lonStart = 77.500;
-  const gridSize = 12; // 144 nodes
-  const step = 0.015;  // Large steps to cover the city
 
-  // 1. Create Nodes
-  for (let i = 0; i < gridSize; i++) {
-    for (let j = 0; j < gridSize; j++) {
-      const id = `mock_${i}_${j}`;
-      const lat = latStart + (i * step);
-      const lon = lonStart + (j * step);
-      graph[id] = { lat, lon, neighbors: [] };
-    }
-  }
-
-  // 2. Connect Nodes with "Dirty" Highways and "Clean" Streets
-  for (let i = 0; i < gridSize; i++) {
-    for (let j = 0; j < gridSize; j++) {
-      const uId = `mock_${i}_${j}`;
-      [[i+1, j], [i, j+1]].forEach(([ni, nj]) => {
-        if (ni < gridSize && nj < gridSize) {
-          const vId = `mock_${ni}_${nj}`;
-          
-          // Logic: Every 4th grid line is a "Main Highway" (High AQI)
-          // The rest are "Quiet Streets" (Low AQI)
-          const isHighWay = (i % 4 === 0 || j % 4 === 0);
-          const highway = isHighWay ? 'primary' : 'residential';
-          const aqi = isHighWay ? 190 : 35;
-          const dist = 1500; // ~1.5km legs
-          
-          // Weighting: Cleanest mode will detour 3x distance to avoid highways
-          const weight = dist * (isHighWay ? 4.0 : 1.1); 
-
-          graph[uId].neighbors.push({ to: vId, dist, weight, aqi, highway });
-          graph[vId].neighbors.push({ to: uId, dist, weight, aqi, highway });
-        }
-      });
-    }
-  }
-  return graph;
-};
 
 const ROAD_POLLUTION_MULTIPLIER = {
   motorway:      2.2,
@@ -105,11 +59,8 @@ const buildGraph = async () => {
       
       if (!response.data?.elements?.length) throw new Error('Empty OSM data');
     } catch (err) {
-      console.warn(`Overpass Mirror Failed: ${err.message}. Triggering Emergency Mock Graph.`);
-      const mockGraph = generateMockGraph();
-      await redisClient.set('bengaluru_graph', JSON.stringify(mockGraph));
-      clearCache();
-      return true;
+      console.warn(`Overpass Mirror Failed: ${err.message}. Routing will be unavailable until OSM data is successfully downloaded.`);
+      return false;
     }
 
     const elements = response.data.elements;
@@ -154,10 +105,7 @@ const buildGraph = async () => {
     return true;
   } catch (error) {
     console.error('Unexpected build error:', error.message);
-    const mockGraph = generateMockGraph();
-    await redisClient.set('bengaluru_graph', JSON.stringify(mockGraph));
-    clearCache();
-    return true;
+    return false;
   }
 };
 

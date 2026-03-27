@@ -16,15 +16,15 @@ export const useRouteStore = create((set, get) => ({
   // Navigation state
   isNavigating: false,
   isArrived: false,
-  tripSummary: null, 
+  tripSummary: null,
   currentPosition: null,  // live GPS { lat, lon }
   isOffRoute: false,
-  
+
   // Map UI state
   showHeatmap: true,
-  is3D: true, // Start in 3D by default for the cool navigation feel
-  autoReroute: true, 
-  
+  is3D: false, // Start in 3D by default for the cool navigation feel
+  autoReroute: true,
+
   // Actions
   setStartCoord: (coord) => set({ startCoord: coord }),
   setEndCoord: (coord) => set({ endCoord: coord }),
