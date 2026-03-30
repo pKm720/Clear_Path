@@ -19,7 +19,7 @@ function App() {
     currentPosition, routes, selectedRouteIndex,
     calculateRoutes, transportMode, endCoord,
     autoReroute, setIsNavigating, setIsArrived,
-    setTripSummary
+    setTripSummary, isDarkMode
   } = useRouteStore();
 
   // Dynamic Rerouting & Arrival Logic
@@ -60,6 +60,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <div
         dir="ltr"
+        className={isDarkMode ? 'dark' : ''}
         style={{
           position: 'fixed',
           inset: 0,

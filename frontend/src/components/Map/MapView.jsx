@@ -5,7 +5,8 @@ import { fetchAllSensors } from '../../services/api';
 import { useRouteStore } from '../../store/routeStore';
 import { getDistance } from '../../utils/geo';
 
-const Style = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+const LightStyle = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+const DarkStyle = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
 const MapView = () => {
   const mapContainer = useRef(null);
@@ -16,7 +17,7 @@ const MapView = () => {
   // Store hocks
   const { 
     routes, selectedRouteIndex, showHeatmap, 
-    currentPosition, isNavigating, is3D
+    currentPosition, isNavigating, is3D, isDarkMode
   } = useRouteStore();
 
   // Fetch all sensors for the heatmap
@@ -31,17 +32,23 @@ const MapView = () => {
     try {
       map.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: Style,
+        style: isDarkMode ? DarkStyle : LightStyle,
         center: [77.5946, 12.9716], // Bengaluru
         zoom: 12.5,
+        minZoom: 10, // Prevent zooming out too far
+        maxBounds: [
+          [77.30, 12.70], // South-West bounding box limit
+          [77.85, 13.20]  // North-East bounding box limit
+        ],
         antialias: true
       });
 
       map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
 
-      map.current.on('load', () => {
-        setMapLoaded(true);
-        map.current.resize();
+      const setupCustomLayers = () => {
+        if (!map.current) return;
+        // Check if layers were dropped
+        if (map.current.getSource('sensors')) return; 
 
         // 1. Initialise Heatmap Source
         map.current.addSource('sensors', {
@@ -56,9 +63,7 @@ const MapView = () => {
           source: 'sensors',
           layout: { 'visibility': 'none' },
           paint: {
-            // Give even clean nodes a base weight of 0.5 so they always have a strong aura
             'heatmap-weight': ['interpolate', ['linear'], ['get', 'aqi'], 0, 0.5, 150, 1.5],
-            // High intensity forces the separate blobs to merge into a continuous map
             'heatmap-intensity': 3.0,
             'heatmap-color': [
               'interpolate', ['linear'], ['heatmap-density'],
@@ -69,7 +74,6 @@ const MapView = () => {
               0.8, '#f97316',             // Orange Core
               1, '#dc2626'                // Red Core
             ],
-            // Massive radius to cover the entire city without zooming out
             'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 120, 10, 150, 15, 300],
             'heatmap-opacity': 0.8
           }
@@ -98,7 +102,6 @@ const MapView = () => {
           data: { type: 'FeatureCollection', features: [] }
         });
         
-        // Route casing (white highlight underneath the main blue line)
         map.current.addLayer({
           id: 'route-casing',
           type: 'line',
@@ -107,7 +110,6 @@ const MapView = () => {
           paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0.9, 'line-blur': 1 }
         });
 
-        // Main Route line
         map.current.addLayer({
           id: 'route-line',
           type: 'line',
@@ -116,7 +118,7 @@ const MapView = () => {
           paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 1.0 }
         });
 
-        // 5. User Location Layer (Raw GPS - Small Indicator)
+        // 5. User Location Layer
         map.current.addSource('user-location', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] }
@@ -134,7 +136,7 @@ const MapView = () => {
           }
         });
 
-        // 6. Snapped Navigation Arrow (Primary Indicator)
+        // 6. Snapped Navigation Arrow
         map.current.addSource('snapped-location', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] }
@@ -144,7 +146,7 @@ const MapView = () => {
           type: 'symbol',
           source: 'snapped-location',
           layout: {
-            'text-field': '▲', // Directional Arrow
+            'text-field': '▲',
             'text-size': 24,
             'text-rotate': ['get', 'bearing'],
             'text-rotation-alignment': 'map',
@@ -157,11 +159,25 @@ const MapView = () => {
             'text-halo-width': 3
           }
         });
+      };
+
+      map.current.on('style.load', setupCustomLayers);
+
+      map.current.on('load', () => {
+        setMapLoaded(true);
+        map.current.resize();
+        setupCustomLayers(); // Initial call
       });
     } catch (err) {
       setErrorMessage(`Init Error: ${err.message}`);
     }
   }, []);
+
+  // Handle Base Style Toggle (Dark/Light Mode)
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    map.current.setStyle(isDarkMode ? DarkStyle : LightStyle);
+  }, [isDarkMode, mapLoaded]);
 
   // Handle 2D/3D Toggle
   useEffect(() => {

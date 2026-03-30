@@ -11,6 +11,7 @@ const SearchPanel = () => {
     calculateRoutes,
     showHeatmap, setShowHeatmap,
     is3D, toggle3D,
+    isDarkMode, toggleDarkMode,
     routes, setIsNavigating, isNavigating
   } = useRouteStore();
 
@@ -26,9 +27,9 @@ const SearchPanel = () => {
   const isReady = startCoord && endCoord;
 
   return (
-    <div className="relative z-50 bg-white/95 backdrop-blur-xl p-3 rounded-2xl shadow-xl border border-white/20 flex flex-col gap-3">
+    <div className="relative z-50 bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl p-3 rounded-2xl shadow-xl border border-white/20 dark:border-slate-800/50 flex flex-col gap-3 transition-colors duration-300">
       <div className="flex justify-between items-center px-1">
-        <h1 className="text-base font-black text-gray-900 tracking-tighter">ClearPath</h1>
+        <h1 className="text-base font-black text-gray-900 dark:text-white tracking-tighter transition-colors duration-300">ClearPath</h1>
         
         <div className="flex gap-2">
           {routes.length > 0 && (
@@ -41,11 +42,22 @@ const SearchPanel = () => {
           )}
           
           <button
+            onClick={toggleDarkMode}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-300 text-[8px] font-black uppercase tracking-widest ${
+              isDarkMode 
+                ? 'bg-slate-800 border-slate-700 text-amber-300 shadow-sm hover:border-slate-600' 
+                : 'bg-white border-gray-100 text-gray-700 hover:border-gray-200'
+            }`}
+          >
+            {isDarkMode ? '🌙' : '☀️'}
+          </button>
+
+          <button
             onClick={toggle3D}
             className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-300 text-[8px] font-black uppercase tracking-widest ${
               is3D 
                 ? 'bg-indigo-500 border-indigo-400 text-white shadow-sm' 
-                : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'
+                : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-400 dark:text-gray-300 hover:border-gray-200 dark:hover:border-slate-600'
             }`}
           >
             {is3D ? '3D' : '2D'}
@@ -56,7 +68,7 @@ const SearchPanel = () => {
             className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all duration-300 text-[8px] font-black uppercase tracking-widest ${
               showHeatmap 
                 ? 'bg-orange-500 border-orange-400 text-white shadow-sm' 
-                : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'
+                : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-400 dark:text-gray-300 hover:border-gray-200 dark:hover:border-slate-600'
             }`}
           >
             <div className={`w-1 h-1 rounded-full ${showHeatmap ? 'bg-white animate-pulse' : 'bg-orange-400'}`} />
@@ -75,7 +87,7 @@ const SearchPanel = () => {
       </div>
 
       <div className="relative">
-        <div className="absolute left-6 h-3 w-px bg-gray-200 -top-1.5 z-0" />
+        <div className="absolute left-6 h-3 w-px bg-gray-200 dark:bg-slate-700 -top-1.5 z-0 transition-colors duration-300" />
         <div className="flex flex-col gap-1.5">
           <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">To</label>
           <LocationInput 
@@ -98,7 +110,7 @@ const SearchPanel = () => {
           className={`w-full p-3 rounded-xl font-bold text-white text-xs transition-all duration-300 shadow-md ${
             isReady 
               ? 'bg-blue-600 hover:bg-blue-700 active:scale-95' 
-              : 'bg-gray-200 cursor-not-allowed text-gray-400'
+              : 'bg-gray-200 dark:bg-slate-800 cursor-not-allowed text-gray-400 dark:text-slate-500 shadow-none'
           }`}
         >
           {isReady ? 'Calculate Path' : 'Select Locations'}

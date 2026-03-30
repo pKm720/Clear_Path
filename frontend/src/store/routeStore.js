@@ -23,6 +23,7 @@ export const useRouteStore = create((set, get) => ({
   // Map UI state
   showHeatmap: true,
   is3D: false, // Start in 3D by default for the cool navigation feel
+  isDarkMode: false, // Start in dark mode 
   autoReroute: true,
 
   // Actions
@@ -58,4 +59,5 @@ export const useRouteStore = create((set, get) => ({
   setShowHeatmap: (show) => set({ showHeatmap: show }),
   toggleHeatmap: () => set((state) => ({ showHeatmap: !state.showHeatmap })),
   toggle3D: () => set((state) => ({ is3D: !state.is3D })),
+  toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
 }));
