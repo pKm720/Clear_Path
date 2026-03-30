@@ -1,5 +1,6 @@
 const { redisClient } = require('../config/db');
-const { haversineDistance } = require('./interpolationService');
+const { haversineDistance, calculateAQIForPoint } = require('./interpolationService');
+const SensorReading = require('../models/SensorReading');
 const FastPriorityQueue = require('fastpriorityqueue');
 
 // Roads accessible per transport mode
@@ -55,11 +56,10 @@ function findNearestNode(lat, lon, nodes, transportMode) {
   const gridY = Math.floor((lon - 77.4) * 250);
   
   const allowedRoads = ACCESSIBLE_ROADS[transportMode];
-  let nearestId = null;
+  let nearestIds = [];
   let minDistance = Infinity;
 
   // Search surrounding grid cells, expanding radius if needed
-  // For the city-scale mock graph, we use a wider search radius to catch distant nodes
   for (let radius = 1; radius <= 50; radius++) {
     for (let dx = -radius; dx <= radius; dx++) {
       for (let dy = -radius; dy <= radius; dy++) {
@@ -74,29 +74,95 @@ function findNearestNode(lat, lon, nodes, transportMode) {
             if (!hasAccess) continue;
           }
           const dist = haversineDistance(lat, lon, node.lat, node.lon);
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearestId = nodeId;
+          if (dist < minDistance + 0.1) { // Keep candidates within a small margin of the absolute closest
+            if (dist < minDistance) minDistance = dist;
+            nearestIds.push(nodeId);
           }
         }
       }
     }
-    if (nearestId) break; // Found a valid node, stop expanding
+    if (nearestIds.length > 0) break; // Found valid nodes, stop expanding
   }
 
   // Hard fallback: ignore access filter, just find nearest
-  if (!nearestId) {
+  if (nearestIds.length === 0) {
     for (const nodeId in nodes) {
       const node = nodes[nodeId];
       const dist = haversineDistance(lat, lon, node.lat, node.lon);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestId = nodeId;
+      if (dist < minDistance + 0.1) {
+        if (dist < minDistance) minDistance = dist;
+        nearestIds.push(nodeId);
       }
     }
   }
 
-  return nearestId;
+  return nearestIds[0]; // For compatibility with existing callers, return the first
+}
+
+/**
+ * Find the nearest point on any edge (road segment) in the graph.
+ */
+function findNearestPointOnEdge(lat, lon, nodes, transportMode) {
+  const gridX = Math.floor((lat - 12.8) * 250);
+  const gridY = Math.floor((lon - 77.4) * 250);
+  const allowedRoads = ACCESSIBLE_ROADS[transportMode];
+  
+  let candidates = [];
+  let minNodeDistance = Infinity;
+
+  // 1. Find a broad set of candidate nodes in the neighborhood
+  for (let radius = 1; radius <= 20; radius++) {
+    let foundInCell = false;
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        const key = `${gridX + dx},${gridY + dy}`;
+        const cellNodes = spatialIndex[key] || [];
+        for (const nodeId of cellNodes) {
+          const node = nodes[nodeId];
+          const dist = haversineDistance(lat, lon, node.lat, node.lon);
+          if (dist < minNodeDistance + 0.5) { // broad 500m window
+             if (dist < minNodeDistance) minNodeDistance = dist;
+             candidates.push(nodeId);
+             foundInCell = true;
+          }
+        }
+      }
+    }
+    if (foundInCell && radius > 2) break; // Stop after finding some nodes
+  }
+
+  // 2. Iterate over all edges connected to these nodes and find the absolute closest point
+  let bestPoint = null;
+  let minEdgeDistance = Infinity;
+  let bestNodeId = null;
+
+  for (const nodeId of candidates) {
+    const node = nodes[nodeId];
+    const neighbors = node.neighbors || [];
+    for (const neighbor of neighbors) {
+      if (allowedRoads && neighbor.highway && !allowedRoads.has(neighbor.highway)) continue;
+      
+      const neighborNode = nodes[neighbor.to];
+      if (!neighborNode) continue;
+
+      const snapped = getClosestPointOnSegment({ lat, lon }, node, neighborNode);
+      const dist = haversineDistance(lat, lon, snapped.lat, snapped.lon);
+
+      if (dist < minEdgeDistance) {
+        minEdgeDistance = dist;
+        bestPoint = snapped;
+        bestNodeId = nodeId; // Start graph search from this junction
+      }
+    }
+  }
+
+  // Fallback to node if no edge found
+  if (!bestPoint && candidates.length > 0) {
+    const node = nodes[candidates[0]];
+    return { lat: node.lat, lon: node.lon, nearestNodeId: candidates[0] };
+  }
+
+  return { ...bestPoint, nearestNodeId: bestNodeId };
 }
 
 /**
@@ -220,6 +286,7 @@ const getRoutes = async (startCoord, endCoord, transportMode = 'car') => {
       console.log('Graph optimization complete.');
     }
 
+    const sensors = await SensorReading.find({ aqi: { $gt: 0 } });
     const graph = cachedGraph;
 
     console.log('Finding nearest nodes using spatial index...');
@@ -229,8 +296,10 @@ const getRoutes = async (startCoord, endCoord, transportMode = 'car') => {
     // For pedestrian mode, snap to main road network nodes (well-connected).
     // Footway nodes in Indian OSM data are isolated stubs with no connection to the main graph.
     const snapMode = transportMode === 'pedestrian' ? 'car' : transportMode;
-    const startNodeId = findNearestNode(startCoord.lat, startLon, graph, snapMode);
-    const endNodeId = findNearestNode(endCoord.lat, endLon, graph, snapMode);
+    const snappedStart = findNearestPointOnEdge(startCoord.lat, startLon, graph, snapMode);
+    const snappedEnd   = findNearestPointOnEdge(endCoord.lat, endLon, graph, snapMode);
+    const startNodeId = snappedStart.nearestNodeId;
+    const endNodeId = snappedEnd.nearestNodeId;
 
     if (!startNodeId || !endNodeId) {
       throw new Error('Could not map coordinates to graph nodes.');
@@ -247,30 +316,40 @@ const getRoutes = async (startCoord, endCoord, transportMode = 'car') => {
     const routes = [];
 
     for (const mode of modes) {
-      const path = await findPath(startNodeId, endNodeId, graph, mode, transportMode);
-      console.log(`  [${transportMode}/${mode}] path found: ${path ? path.length + ' nodes' : 'null'}`);
-      if (path) {
+      const graphPath = await findPath(startNodeId, endNodeId, graph, mode, transportMode);
+      console.log(`  [${transportMode}/${mode}] path found: ${graphPath ? graphPath.length + ' nodes' : 'null'}`);
+      
+      if (graphPath) {
+        // INJECT SNAPPED POINTS: Use exact edge coordinates instead of markers/off-road junctions
+        const fullPath = [
+          { lat: snappedStart.lat, lon: snappedStart.lon },
+          ...graphPath.map(p => ({ lat: p.lat, lon: p.lon })),
+          { lat: snappedEnd.lat, lon: snappedEnd.lon }
+        ];
+
         let totalDist = 0;
         let totalAQI = 0;
         let edgeCount = 0;
 
-        for (let i = 0; i < path.length - 1; i++) {
-          const uId = path[i].id;
-          const vId = path[i+1].id;
+        // Calculate path stats for the entire path (including the connector segments)
+        for (let i = 0; i < fullPath.length - 1; i++) {
+          const p1 = fullPath[i];
+          const p2 = fullPath[i+1];
+          const dist = haversineDistance(p1.lat, p1.lon, p2.lat, p2.lon);
           
-          const node = graph[uId];
-          const edge = node.neighbors.find(n => String(n.to) === vId);
+          // Midpoint AQI interpolation for the segment
+          const midLat = (p1.lat + p2.lat) / 2;
+          const midLon = (p1.lon + p2.lon) / 2;
+          const aqi = await calculateAQIForPoint(midLat, midLon, sensors);
 
-          if (edge) {
-            totalDist += edge.dist;
-            totalAQI += edge.aqi;
-            edgeCount++;
-          }
+          totalDist += dist;
+          totalAQI += aqi;
+          edgeCount++;
         }
 
         routes.push({
           mode,
-          path: path.map(p => ({ lat: p.lat, lon: p.lon })), 
+          path: fullPath, 
           distance: parseFloat(totalDist.toFixed(2)),
           duration: Math.round((totalDist / SPEED_KMH[transportMode]) * 60), // Minutes at mode-specific speed
           avgAQI: edgeCount > 0 ? Math.round(totalAQI / edgeCount) : 0,

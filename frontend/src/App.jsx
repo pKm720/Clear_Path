@@ -56,19 +56,20 @@ function App() {
     }
   }, [currentPosition, isNavigating, routes, selectedRouteIndex, autoReroute]);
 
+  // Apply dark mode to global HTML tag for seamless Tailwind matching
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <div
         dir="ltr"
-        className={isDarkMode ? 'dark' : ''}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          width: '100vw',
-          height: '100vh',
-          background: 'white',
-          overflow: 'hidden'
-        }}
+        className={`w-screen h-screen overflow-hidden fixed inset-0 transition-colors duration-500 bg-white dark:bg-slate-900`}
       >
         {/* Main Map Background */}
         <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>

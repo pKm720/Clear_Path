@@ -12,7 +12,7 @@ const SearchPanel = () => {
     showHeatmap, setShowHeatmap,
     is3D, toggle3D,
     isDarkMode, toggleDarkMode,
-    routes, setIsNavigating, isNavigating
+    routes, setRoutes, setIsNavigating, isNavigating
   } = useRouteStore();
 
   const handleSearch = () => {
@@ -24,6 +24,13 @@ const SearchPanel = () => {
     );
   };
 
+  const handleClear = () => {
+    setRoutes([]);
+    setStartCoord(null);
+    setEndCoord(null);
+    setIsNavigating(false);
+  };
+
   const isReady = startCoord && endCoord;
 
   return (
@@ -31,11 +38,11 @@ const SearchPanel = () => {
       <div className="flex justify-between items-center px-1">
         <h1 className="text-base font-black text-gray-900 dark:text-white tracking-tighter transition-colors duration-300">ClearPath</h1>
         
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-1.5 ml-2">
           {routes.length > 0 && (
             <button 
-              onClick={() => setRoutes([])}
-              className="text-[9px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-widest px-1"
+              onClick={handleClear}
+              className="flex items-center gap-1 px-2 py-1 rounded-full border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 text-[8px] font-black text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 uppercase tracking-widest transition-colors"
             >
               Clear
             </button>
@@ -80,9 +87,10 @@ const SearchPanel = () => {
       <div className="flex flex-col gap-1.5">
         <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">From</label>
         <LocationInput 
-          placeholder="Start" 
+          placeholder="Add Start Location" 
           value={startCoord}
-          onSelect={setStartCoord} 
+          onSelect={setStartCoord}
+          inputType="start"
         />
       </div>
 
@@ -91,9 +99,10 @@ const SearchPanel = () => {
         <div className="flex flex-col gap-1.5">
           <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">To</label>
           <LocationInput 
-            placeholder="End" 
+            placeholder="Add End Location" 
             value={endCoord}
-            onSelect={setEndCoord} 
+            onSelect={setEndCoord}
+            inputType="end"
           />
         </div>
       </div>
@@ -119,7 +128,7 @@ const SearchPanel = () => {
         {routes.length > 0 && (
           <button
             onClick={() => setIsNavigating(true)}
-            className="w-full p-3 rounded-xl font-black text-white text-xs bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 uppercase tracking-widest mt-1 transition-all active:scale-95 animate-in fade-in zoom-in-95 duration-300"
+            className="w-full p-3 rounded-xl font-black text-white text-xs bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20 uppercase tracking-widest mt-1 transition-all active:scale-95 animate-in fade-in zoom-in-95 duration-300"
           >
             Start Trip
           </button>

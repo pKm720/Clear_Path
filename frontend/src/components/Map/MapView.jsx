@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAllSensors } from '../../services/api';
 import { useRouteStore } from '../../store/routeStore';
@@ -13,11 +14,14 @@ const MapView = () => {
   const map = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [styleLoadedTimestamp, setStyleLoadedTimestamp] = useState(0);
   
-  // Store hocks
+  // Store hooks
   const { 
     routes, selectedRouteIndex, showHeatmap, 
-    currentPosition, isNavigating, is3D, isDarkMode
+    currentPosition, isNavigating, is3D, isDarkMode,
+    startCoord, endCoord,
+    setStartCoord, setEndCoord, activeInput, setActiveInput
   } = useRouteStore();
 
   // Fetch all sensors for the heatmap
@@ -159,6 +163,64 @@ const MapView = () => {
             'text-halo-width': 3
           }
         });
+
+        // 7. Start (green) + End (red) pin markers
+        map.current.addSource('start-marker', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.current.addLayer({
+          id: 'start-marker-outer',
+          type: 'circle',
+          source: 'start-marker',
+          paint: {
+            'circle-radius': 10,
+            'circle-color': '#22c55e',
+            'circle-stroke-width': 3,
+            'circle-stroke-color': '#ffffff',
+            'circle-opacity': 1
+          }
+        });
+        map.current.addLayer({
+          id: 'start-marker-inner',
+          type: 'circle',
+          source: 'start-marker',
+          paint: {
+            'circle-radius': 4,
+            'circle-color': '#ffffff',
+            'circle-opacity': 1
+          }
+        });
+
+        map.current.addSource('end-marker', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.current.addLayer({
+          id: 'end-marker-outer',
+          type: 'circle',
+          source: 'end-marker',
+          paint: {
+            'circle-radius': 10,
+            'circle-color': '#ef4444',
+            'circle-stroke-width': 3,
+            'circle-stroke-color': '#ffffff',
+            'circle-opacity': 1
+          }
+        });
+        map.current.addLayer({
+          id: 'end-marker-inner',
+          type: 'circle',
+          source: 'end-marker',
+          paint: {
+            'circle-radius': 4,
+            'circle-color': '#ffffff',
+            'circle-opacity': 1
+          }
+        });
+
+        // Trigger effects to repopulate data into these fresh sources
+        setStyleLoadedTimestamp(Date.now());
       };
 
       map.current.on('style.load', setupCustomLayers);
@@ -187,6 +249,65 @@ const MapView = () => {
       duration: 1000
     });
   }, [is3D, mapLoaded]);
+
+  // Map click-to-set-location — attach/detach handler with activeInput
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Change cursor to crosshair when waiting for a click
+    map.current.getCanvas().style.cursor = activeInput ? 'crosshair' : '';
+
+    if (!activeInput) return;
+
+    const handleMapClick = async (e) => {
+      const { lng, lat } = e.lngLat;
+      // Immediately clear active state so second clicks don't re-trigger
+      setActiveInput(null);
+      map.current.getCanvas().style.cursor = '';
+
+      // Reverse geocode with Nominatim (OSM) — works for any coordinate including parks/railways
+      let label = `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`; // readable fallback
+      try {
+        const resp = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+          params: { format: 'json', lat, lon: lng, zoom: 17, addressdetails: 1 },
+          headers: { 'Accept-Language': 'en' }
+        });
+        if (resp.data && !resp.data.error) {
+          const a = resp.data.address || {};
+          // Build short label: most specific first, then area
+          const spot = a.amenity || a.building || a.road || a.neighbourhood || a.suburb;
+          const area = a.suburb || a.neighbourhood || a.city_district || a.city || a.town;
+          if (spot && area && spot !== area) {
+            label = `${spot}, ${area}`;
+          } else if (spot) {
+            label = spot;
+          } else if (area) {
+            label = area;
+          } else if (resp.data.display_name) {
+            // Take first 2 parts of display_name as a last resort
+            label = resp.data.display_name.split(',').slice(0, 2).join(',').trim();
+          }
+        }
+      } catch (err) {
+        console.warn('Reverse geocode failed:', err.message);
+      }
+
+      const coord = { lat, lon: lng, label };
+      if (activeInput === 'start') {
+        setStartCoord(coord);
+      } else {
+        setEndCoord(coord);
+      }
+    };
+
+    map.current.once('click', handleMapClick);
+
+    // Cleanup: remove handler if activeInput is cleared externally
+    return () => {
+      map.current?.off('click', handleMapClick);
+      if (map.current) map.current.getCanvas().style.cursor = '';
+    };
+  }, [activeInput, mapLoaded]);
 
   // Snap-to-Route Helper
   const getSnappedPoint = (pos, path) => {
@@ -246,22 +367,54 @@ const MapView = () => {
         duration: 1000
       });
     }
-  }, [currentPosition, isNavigating, mapLoaded, routes, selectedRouteIndex]);
+  }, [currentPosition, isNavigating, mapLoaded, routes, selectedRouteIndex, styleLoadedTimestamp, is3D]);
+
+  // Update Start / End pin markers on the map
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    const startSrc = map.current.getSource('start-marker');
+    if (startSrc) {
+      startSrc.setData(startCoord
+        ? { type: 'Feature', geometry: { type: 'Point', coordinates: [startCoord.lon, startCoord.lat] } }
+        : { type: 'FeatureCollection', features: [] }
+      );
+    }
+
+    const endSrc = map.current.getSource('end-marker');
+    if (endSrc) {
+      endSrc.setData(endCoord
+        ? { type: 'Feature', geometry: { type: 'Point', coordinates: [endCoord.lon, endCoord.lat] } }
+        : { type: 'FeatureCollection', features: [] }
+      );
+    }
+  }, [startCoord, endCoord, mapLoaded, styleLoadedTimestamp]);
 
   // Update Route Visually
   useEffect(() => {
-    if (!map.current || !mapLoaded || !routes.length) return;
+    if (!map.current || !mapLoaded) return;
+
+    // Clear the line when routes are removed (e.g. user hits Clear)
+    if (!routes.length) {
+      const source = map.current.getSource('route');
+      if (source) {
+        source.setData({ type: 'FeatureCollection', features: [] });
+      }
+      return;
+    }
     const currentRoute = routes[selectedRouteIndex];
     if (!currentRoute?.path) return;
 
     const source = map.current.getSource('route');
     if (source) {
+      // Use road-network path as-is — pins show exact pick, route follows real roads
       const coords = currentRoute.path.map(p => [p.lon, p.lat]);
+
       source.setData({
         type: 'Feature',
         geometry: { type: 'LineString', coordinates: coords }
       });
-      
+
       const bounds = coords.reduce((acc, coord) => acc.extend(coord), new maplibregl.LngLatBounds(coords[0], coords[0]));
       map.current.fitBounds(bounds, { padding: 100, duration: 1000 });
 
@@ -285,7 +438,7 @@ const MapView = () => {
       if (map.current.getLayer('route-casing')) map.current.setPaintProperty('route-casing', 'line-dasharray', [0, 1]);
       animateLine();
     }
-  }, [routes, selectedRouteIndex, mapLoaded]);
+  }, [routes, selectedRouteIndex, mapLoaded, styleLoadedTimestamp]);
 
   // Update Sensors and Heatmap Visibility
   useEffect(() => {
@@ -305,7 +458,7 @@ const MapView = () => {
     if (map.current.getLayer('aqi-heat')) map.current.setLayoutProperty('aqi-heat', 'visibility', visibility);
     if (map.current.getLayer('aqi-points')) map.current.setLayoutProperty('aqi-points', 'visibility', visibility);
     
-  }, [sensorData, showHeatmap, mapLoaded]);
+  }, [sensorData, showHeatmap, mapLoaded, styleLoadedTimestamp]);
 
   return (
     <div
@@ -337,6 +490,28 @@ const MapView = () => {
           </div>
         </div>
       )}
+      {/* Floating hint when waiting for a map click */}
+      {activeInput && (
+        <div
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-2 duration-300"
+          style={{ pointerEvents: 'none' }}
+        >
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-500/30 backdrop-blur-sm border border-blue-400">
+            <span className="text-base">📍</span>
+            <p className="text-xs font-black uppercase tracking-widest">
+              Click map to set <span className="text-blue-200">{activeInput === 'start' ? 'Start' : 'End'}</span> location
+            </p>
+            <button
+              style={{ pointerEvents: 'auto' }}
+              onClick={() => setActiveInput(null)}
+              className="ml-1 text-blue-200 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -22,9 +22,10 @@ export const useRouteStore = create((set, get) => ({
 
   // Map UI state
   showHeatmap: true,
-  is3D: false, // Start in 3D by default for the cool navigation feel
-  isDarkMode: false, // Start in dark mode 
+  is3D: false,
+  isDarkMode: false,
   autoReroute: true,
+  activeInput: null, // 'start' | 'end' | null — which input is waiting for a map click
 
   // Actions
   setStartCoord: (coord) => set({ startCoord: coord }),
@@ -60,4 +61,5 @@ export const useRouteStore = create((set, get) => ({
   toggleHeatmap: () => set((state) => ({ showHeatmap: !state.showHeatmap })),
   toggle3D: () => set((state) => ({ is3D: !state.is3D })),
   toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
+  setActiveInput: (input) => set({ activeInput: input }),
 }));

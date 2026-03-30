@@ -4,7 +4,7 @@ const SensorReading = require('../models/SensorReading');
 const { calculateAQIForPoint, haversineDistance } = require('./interpolationService');
 const { clearCache } = require('./routingService');
 
-const BENGALURU_BBOX = '12.85,77.50,13.10,77.75'; // City-wide BBox
+const BENGALURU_BBOX = '12.91,77.56,13.04,77.70'; // Focused Central City BBox
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.openstreetmap.fr/api/interpreter',
@@ -41,25 +41,34 @@ const buildGraph = async () => {
     console.log('Attempting to fetch live OSM data (Fast 30s Timeout)...');
     
     const query = `
-      [out:json][timeout:30];
+      [out:json][timeout:60];
       (
-        way["highway"~"motorway|trunk|primary|secondary|tertiary"](${BENGALURU_BBOX});
+        way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street"](${BENGALURU_BBOX});
       );
       (._;>;);
       out body;
     `;
 
     let response;
-    try {
-      console.log('Requesting optimized arterial network (should take ~10s)...');
-      response = await axios.post(OVERPASS_MIRRORS[0], `data=${encodeURIComponent(query)}`, {
-        timeout: 45000,
-        headers: { 'User-Agent': 'ClearPath-Arterial-Bot/1.2' }
-      });
-      
-      if (!response.data?.elements?.length) throw new Error('Empty OSM data');
-    } catch (err) {
-      console.warn(`Overpass Mirror Failed: ${err.message}. Routing will be unavailable until OSM data is successfully downloaded.`);
+    let lastError;
+    for (const mirror of OVERPASS_MIRRORS) {
+      try {
+        console.log(`Trying Overpass mirror: ${mirror} ...`);
+        response = await axios.post(mirror, `data=${encodeURIComponent(query)}`, {
+          timeout: 45000,
+          headers: { 'User-Agent': 'ClearPath-Arterial-Bot/1.2' }
+        });
+        if (!response.data?.elements?.length) throw new Error('Empty OSM data from mirror');
+        console.log(`Successfully fetched OSM data from: ${mirror}`);
+        break; // Success — stop trying other mirrors
+      } catch (err) {
+        lastError = err;
+        console.warn(`Overpass Mirror Failed (${mirror}): ${err.message}. Trying next mirror...`);
+      }
+    }
+
+    if (!response?.data?.elements?.length) {
+      console.warn(`All Overpass mirrors failed. Last error: ${lastError?.message}. Routing will be unavailable until OSM data is successfully downloaded.`);
       return false;
     }
 

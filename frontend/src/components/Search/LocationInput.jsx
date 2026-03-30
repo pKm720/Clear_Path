@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useRouteStore } from '../../store/routeStore';
 
 const PHOTON_BASE = 'https://photon.komoot.io/api/';
 const BENGALURU_BBOX = '77.3,12.8,77.9,13.2'; // [minLon, minLat, maxLon, maxLat]
 
-const LocationInput = ({ placeholder, onSelect, value }) => {
+const LocationInput = ({ placeholder, onSelect, value, inputType }) => {
+  const { activeInput, setActiveInput } = useRouteStore();
+  const isActiveForMapClick = activeInput === inputType;
   const [query, setQuery] = useState(value?.label || '');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -21,6 +24,15 @@ const LocationInput = ({ placeholder, onSelect, value }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Sync internal text query if external value resets (e.g. from Clear button)
+  useEffect(() => {
+    if (!value) {
+      setQuery('');
+    } else if (value.label && value.label !== query) {
+      setQuery(value.label);
+    }
+  }, [value]);
 
   const searchLocations = async (text) => {
     if (text.length < 2) {
@@ -76,9 +88,20 @@ const LocationInput = ({ placeholder, onSelect, value }) => {
           type="text"
           value={query}
           onChange={handleChange}
-          onFocus={() => results.length > 0 && setShowDropdown(true)}
-          placeholder={placeholder}
-          className="w-full bg-gray-50/50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 p-4 pl-12 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors duration-300 font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500"
+          onFocus={() => {
+            setActiveInput(inputType);
+            if (results.length > 0) setShowDropdown(true);
+          }}
+          onBlur={() => {
+            // Small delay so a map-click can register before we clear activeInput
+            setTimeout(() => setActiveInput(null), 200);
+          }}
+          placeholder={isActiveForMapClick ? '📍 or click on map...' : placeholder}
+          className={`w-full bg-gray-50/50 dark:bg-slate-800/80 border p-4 pl-12 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors duration-300 font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 ${
+            isActiveForMapClick
+              ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/30'
+              : 'border-gray-200 dark:border-slate-700'
+          }`}
         />
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
