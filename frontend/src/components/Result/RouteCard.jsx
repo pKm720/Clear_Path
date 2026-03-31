@@ -24,10 +24,10 @@ const RouteCard = ({ route, index, isSelected, onClick, modes = [], benefit = 0 
         e.stopPropagation();
         onClick();
       }}
-      className={`w-full text-left p-2 rounded-xl transition-all duration-300 border-2 cursor-pointer relative z-10 ${
+      className={`w-[260px] shrink-0 text-left p-3 rounded-2xl transition-all duration-300 border-2 cursor-pointer relative z-10 ${
         isSelected 
-          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 shadow-sm scale-[1.01]' 
-          : 'bg-white dark:bg-slate-800 border-transparent hover:border-gray-200 dark:hover:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700/50 shadow-sm'
+          ? 'bg-blue-50 dark:bg-blue-900/40 border-blue-500 shadow-lg scale-[1.02] -translate-y-1' 
+          : 'bg-white dark:bg-slate-800/90 border-transparent hover:border-gray-200 dark:hover:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 shadow-sm'
       }`}
     >
       <div className="mb-1.5 flex justify-between items-center">

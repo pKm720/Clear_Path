@@ -31,7 +31,7 @@ const RouteResults = () => {
   const fastestAQI = fastestRoute?.avgAQI || 0;
 
   return (
-    <div className="mt-2 flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-6 duration-500 overflow-y-auto max-h-[calc(100vh-320px)] pr-1 custom-scrollbar">
+    <>
       {displayRoutes.map((route, idx) => {
         // Find which ORIGINAL index in the 'routes' array this display route corresponds to
         const originalIndex = routes.findIndex(r => r.mode === route.modes[0]);
@@ -54,7 +54,7 @@ const RouteResults = () => {
           />
         );
       })}
-    </div>
+    </>
   );
 };
 

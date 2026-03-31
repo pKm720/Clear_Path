@@ -3,7 +3,7 @@ const WAQI_TOKEN = process.env.WAQI_TOKEN || 'demo';
 
 const fetchFromWAQI = async () => {
   try {
-    const BBOX = '12.8,77.4,13.2,77.8';
+    const BBOX = '12.8,77.3,13.2,77.9';
     const response = await axios.get(`https://api.waqi.info/map/bounds/?latlng=${BBOX}&token=${WAQI_TOKEN}`);
     if (response.data.status !== 'ok') return [];
 
@@ -27,7 +27,7 @@ const fetchOpenAQData = async () => {
   try {
     // OpenAQ v3 API: Search by Bounding Box for Bengaluru coverage
     // BBOX: [minLon, minLat, maxLon, maxLat]
-    const BBOX = '77.4,12.8,77.8,13.2';
+    const BBOX = '77.3,12.8,77.9,13.2';
     const OPENAQ_KEY = process.env.OPENAQ_API_KEY;
     const headers = { 'Accept': 'application/json' };
     if (OPENAQ_KEY) headers['X-API-Key'] = OPENAQ_KEY;

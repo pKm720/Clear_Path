@@ -4,7 +4,8 @@ const SensorReading = require('../models/SensorReading');
 const { calculateAQIForPoint, haversineDistance } = require('./interpolationService');
 const { clearCache } = require('./routingService');
 
-const BENGALURU_BBOX = '12.91,77.56,13.04,77.70'; // Focused Central City BBox
+const CENTER_BBOX = '12.91,77.56,13.04,77.70'; // High Density (Full Street Detail)
+const CITY_WIDE_BBOX = '12.83,77.37,13.14,77.83'; // Outer Suburbs (Major Arterials Only)
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.openstreetmap.fr/api/interpreter',
@@ -43,7 +44,11 @@ const buildGraph = async () => {
     const query = `
       [out:json][timeout:60];
       (
-        way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street"](${BENGALURU_BBOX});
+        // 1. All roads for the central 15x15km core
+        way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street"](${CENTER_BBOX});
+        
+        // 2. Major arterials for the entire 35x45km Bengaluru city region
+        way["highway"~"motorway|trunk|primary|secondary|tertiary"](${CITY_WIDE_BBOX});
       );
       (._;>;);
       out body;

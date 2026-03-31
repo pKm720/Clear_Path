@@ -13,7 +13,16 @@ const LocationInput = ({ placeholder, onSelect, value, inputType }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
+  const textareaRef = useRef(null);
   const timeoutRef = useRef(null);
+
+  // Auto-resize textarea height as query grows
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [query]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -84,9 +93,10 @@ const LocationInput = ({ placeholder, onSelect, value, inputType }) => {
   return (
     <div className="relative w-full" ref={dropdownRef}>
       <div className="relative group">
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
           value={query}
+          rows="1"
           onChange={handleChange}
           onFocus={() => {
             setActiveInput(inputType);
@@ -97,20 +107,20 @@ const LocationInput = ({ placeholder, onSelect, value, inputType }) => {
             setTimeout(() => setActiveInput(null), 200);
           }}
           placeholder={isActiveForMapClick ? '📍 or click on map...' : placeholder}
-          className={`w-full bg-gray-50/50 dark:bg-slate-800/80 border p-4 pl-12 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors duration-300 font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 ${
+          className={`w-full bg-gray-50/50 dark:bg-slate-800/80 border p-4 pl-12 pr-10 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-300 font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 resize-none min-h-[56px] overflow-hidden leading-tight ${
             isActiveForMapClick
               ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/30'
               : 'border-gray-200 dark:border-slate-700'
           }`}
         />
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="absolute left-4 top-[18px] text-gray-400">
+          <svg className="w-5 h-5 transition-colors group-focus-within:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </div>
         {isSearching && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+          <div className="absolute right-4 top-[18px]">
             <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
@@ -129,11 +139,11 @@ const LocationInput = ({ placeholder, onSelect, value, inputType }) => {
                 onClick={() => handleSelect(feature)}
                 className="w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 border-b border-gray-50 dark:border-slate-700/50 last:border-0 transition-colors duration-150 group"
               >
-                <p className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate transition-colors duration-200">
+                <p className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 leading-snug">
                   {title}
                 </p>
                 {subtitle && (
-                  <p className="text-sm text-gray-400 dark:text-slate-400 truncate mt-0.5">
+                  <p className="text-xs text-gray-400 dark:text-slate-400 mt-1 leading-normal truncate">
                     {subtitle}
                   </p>
                 )}
