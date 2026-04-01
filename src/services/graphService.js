@@ -1,6 +1,6 @@
 const axios = require('axios');
 const { redisClient } = require('../config/db');
-const SensorReading = require('../models/SensorReading');
+const { getUnifiedSensors } = require('./sensorService');
 const { calculateAQIForPoint, haversineDistance } = require('./interpolationService');
 const { clearCache } = require('./routingService');
 
@@ -33,7 +33,8 @@ const ROAD_POLLUTION_MULTIPLIER = {
  */
 const buildGraph = async () => {
   try {
-    const sensors = await SensorReading.find({ aqi: { $gt: 0 } });
+    // Discovery of all sensors including physical and AI-predicted virtual stations
+    const sensors = await getUnifiedSensors();
     const aqiValues = sensors.length > 0 ? sensors.map(s => s.aqi) : [50];
     const minAQI = Math.min(...aqiValues);
     const maxAQI = Math.max(...aqiValues);

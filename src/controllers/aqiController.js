@@ -1,5 +1,5 @@
 const { calculateAQIForPoint } = require('../services/interpolationService');
-const SensorReading = require('../models/SensorReading');
+const { getUnifiedSensors } = require('../services/sensorService');
 
 /**
  * Retrieves estimated AQI for a specific geographic point.
@@ -23,11 +23,13 @@ const getAQIAtPoint = async (req, res) => {
 };
 
 /**
- * Retrieves all physical sensor readings currently stored.
+ * Retrieves all physical sensor readings currently stored and 
+ * merges them with live predicted virtual sensors from the ML engine.
  */
 const getAllSensors = async (req, res) => {
   try {
-    const sensors = await SensorReading.find({});
+    // Utilizing the Sensor Intelligence Hub for a unified Bengaluru data layer
+    const sensors = await getUnifiedSensors();
     res.json(sensors);
   } catch (error) {
     console.error('Sensor retrieval error:', error.message);

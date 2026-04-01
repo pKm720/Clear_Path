@@ -1,4 +1,4 @@
-const SensorReading = require('../models/SensorReading');
+const { getUnifiedSensors } = require('./sensorService');
 const MIN_AQI = 40;
 const MAX_AQI = 160;
 
@@ -51,8 +51,8 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
  */
 const calculateAQIForPoint = async (targetLat, targetLon, preFetchedSensors = null, power = 2) => {
   try {
-    // DB fetch only if sensors not provided
-    const sensors = preFetchedSensors || await SensorReading.find({ aqi: { $gt: 0 } });
+    // Discovery only if sensors not provided; utilizes the unified sensor hub
+    const sensors = preFetchedSensors || await getUnifiedSensors();
 
     if (!sensors || sensors.length === 0) {
       return getBaselineAQI();

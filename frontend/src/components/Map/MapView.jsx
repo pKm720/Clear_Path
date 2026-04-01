@@ -445,18 +445,76 @@ const MapView = () => {
     if (!map.current || !mapLoaded) return;
 
     const source = map.current.getSource('sensors');
-    if (source && sensorData?.data) {
-      const features = sensorData.data.map(sensor => ({
+    if (source && sensorData) {
+      // Map readings into GeoJSON features, preserving the 'isVirtual' flag
+      const features = (sensorData.data || sensorData).map(sensor => ({
         type: 'Feature',
-        properties: { aqi: sensor.aqi },
+        properties: { 
+          aqi: sensor.aqi, 
+          stationName: sensor.stationName,
+          isVirtual: sensor.isVirtual || false 
+        },
         geometry: { type: 'Point', coordinates: [sensor.lng, sensor.lat] }
       }));
       source.setData({ type: 'FeatureCollection', features });
     }
 
+    // Interactive Popups for Sensors
+    const handleSensorClick = (e) => {
+      const features = map.current.queryRenderedFeatures(e.point, { layers: ['aqi-points'] });
+      if (!features.length) return;
+
+      const feature = features[0];
+      const props = feature.properties;
+      const coordinates = feature.geometry.coordinates.slice();
+
+      const popupContent = `
+        <div style="padding: 8px; font-family: sans-serif;">
+          <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${props.isVirtual ? '#6366f1' : '#64748b'}; margin-bottom: 4px;">
+            ${props.isVirtual ? '✨ Virtual Sensor (AI Predicted)' : '📡 Physical Station'}
+          </div>
+          <div style="font-size: 14px; font-weight: 800; color: #1e293b; margin-bottom: 8px;">${props.stationName}</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="font-size: 24px; font-weight: 900; color: #1e293b;">${Math.round(props.aqi)}</div>
+            <div style="font-size: 10px; font-weight: 700; color: #64748b; line-height: 1;">PM2.5<br/>AQI</div>
+          </div>
+        </div>
+      `;
+
+      new maplibregl.Popup({ closeButton: false, offset: 15 })
+        .setLngLat(coordinates)
+        .setHTML(popupContent)
+        .addTo(map.current);
+    };
+
+    map.current.on('click', 'aqi-points', handleSensorClick);
+    map.current.on('mouseenter', 'aqi-points', () => { map.current.getCanvas().style.cursor = 'pointer'; });
+    map.current.on('mouseleave', 'aqi-points', () => { map.current.getCanvas().style.cursor = ''; });
+
+    // Update visibility based on UI store
     const visibility = showHeatmap ? 'visible' : 'none';
     if (map.current.getLayer('aqi-heat')) map.current.setLayoutProperty('aqi-heat', 'visibility', visibility);
-    if (map.current.getLayer('aqi-points')) map.current.setLayoutProperty('aqi-points', 'visibility', visibility);
+    if (map.current.getLayer('aqi-points')) {
+      map.current.setLayoutProperty('aqi-points', 'visibility', visibility);
+      
+      // Visual distinction: Indigo stroke for Virtual Sensors, White for Physical
+      map.current.setPaintProperty('aqi-points', 'circle-stroke-color', [
+        'case',
+        ['boolean', ['get', 'isVirtual'], false], '#6366f1', // Indigo highlight
+        '#ffffff' // Default white
+      ]);
+      map.current.setPaintProperty('aqi-points', 'circle-stroke-width', [
+        'case',
+        ['boolean', ['get', 'isVirtual'], false], 3,
+        2
+      ]);
+    }
+
+    return () => {
+      if (map.current) {
+        map.current.off('click', 'aqi-points', handleSensorClick);
+      }
+    };
     
   }, [sensorData, showHeatmap, mapLoaded, styleLoadedTimestamp]);
 
