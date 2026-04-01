@@ -61,6 +61,9 @@ const calculateAQIForPoint = async (targetLat, targetLon, preFetchedSensors = nu
     let numerator = 0;
     let denominator = 0;
 
+    // Confidence-weighted IDW: Prioritizing ground-truth physical sensors
+    const VIRTUAL_WEIGHT = 0.6; 
+
     for (const sensor of sensors) {
       const distance = haversineDistance(targetLat, targetLon, sensor.lat, sensor.lng);
 
@@ -68,7 +71,13 @@ const calculateAQIForPoint = async (targetLat, targetLon, preFetchedSensors = nu
         return sensor.aqi;
       }
 
-      const weight = 1 / Math.pow(distance, power);
+      let weight = 1 / Math.pow(distance, power);
+      
+      // Artificial/Predicted data is given a lower confidence coefficient
+      if (sensor.isVirtual) {
+        weight *= VIRTUAL_WEIGHT;
+      }
+
       numerator += weight * sensor.aqi;
       denominator += weight;
     }

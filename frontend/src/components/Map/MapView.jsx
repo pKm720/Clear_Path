@@ -491,11 +491,15 @@ const MapView = () => {
     map.current.on('mouseenter', 'aqi-points', () => { map.current.getCanvas().style.cursor = 'pointer'; });
     map.current.on('mouseleave', 'aqi-points', () => { map.current.getCanvas().style.cursor = ''; });
 
-    // Update visibility based on UI store
-    const visibility = showHeatmap ? 'visible' : 'none';
-    if (map.current.getLayer('aqi-heat')) map.current.setLayoutProperty('aqi-heat', 'visibility', visibility);
+    // Layer visibility: Heatmap is togglable, but sensor pins stay visible globally
+    const heatVisibility = showHeatmap ? 'visible' : 'none';
+    if (map.current.getLayer('aqi-heat')) {
+      map.current.setLayoutProperty('aqi-heat', 'visibility', heatVisibility);
+    }
+    
+    // Physical and Virtual sensor pins remain as permanent navigational anchors
     if (map.current.getLayer('aqi-points')) {
-      map.current.setLayoutProperty('aqi-points', 'visibility', visibility);
+      map.current.setLayoutProperty('aqi-points', 'visibility', 'visible');
       
       // Visual distinction: Indigo stroke for Virtual Sensors, White for Physical
       map.current.setPaintProperty('aqi-points', 'circle-stroke-color', [
