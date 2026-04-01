@@ -1,4 +1,26 @@
 const SensorReading = require('../models/SensorReading');
+const MIN_AQI = 40;
+const MAX_AQI = 160;
+
+function getBaselineAQI(date = new Date()) {
+  let aqi = 85; // base
+
+  const month = date.getMonth() + 1;
+  const hour = date.getHours();
+
+  // Season effect
+  if ([6, 7, 8, 9].includes(month)) aqi -= 20;       // Monsoon
+  else if ([10, 11, 12, 1, 2].includes(month)) aqi += 20; // Winter
+
+  // Time effect
+  if (hour >= 7 && hour <= 10) aqi += 30;   // Morning rush
+  else if (hour >= 13 && hour <= 17) aqi -= 15; // Afternoon clean
+  else if (hour >= 18 && hour <= 21) aqi += 25; // Evening peak traffic
+  else if (hour >= 0 && hour <= 5) aqi += 20;   // Night stagnation
+
+  // Clamp
+  return Math.max(MIN_AQI, Math.min(aqi, MAX_AQI));
+}
 
 //Calculate Haversine distance between two points in km.
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -33,7 +55,7 @@ const calculateAQIForPoint = async (targetLat, targetLon, preFetchedSensors = nu
     const sensors = preFetchedSensors || await SensorReading.find({ aqi: { $gt: 0 } });
 
     if (!sensors || sensors.length === 0) {
-      return 50; 
+      return getBaselineAQI();
     }
 
     let numerator = 0;
@@ -51,13 +73,13 @@ const calculateAQIForPoint = async (targetLat, targetLon, preFetchedSensors = nu
       denominator += weight;
     }
 
-    if (denominator === 0) return 50;
+    if (denominator === 0) return getBaselineAQI();
 
     return Math.round(numerator / denominator);
 
   } catch (error) {
     console.error('Interpolation Error:', error.message);
-    return 50;
+    return getBaselineAQI();
   }
 };
 
