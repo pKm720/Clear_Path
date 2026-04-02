@@ -76,8 +76,8 @@ The biggest challenge in environmental monitoring is **Hardware Density**. Most 
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ## ✉️ Contact
-**Author** - [Your Name/GitHub Profile]
-Project Link: (https://github.com/pKm720/Clear_Path)
+**Author** - https://github.com/pKm720
+- Project Link: (https://github.com/pKm720/Clear_Path)
 
 ---
 *Created with ❤️ to help urban commuters breathe better.*
