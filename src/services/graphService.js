@@ -49,7 +49,7 @@ const buildGraph = async () => {
         way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street"](${CENTER_BBOX});
         
         // 2. Major arterials for the entire 35x45km Bengaluru city region
-        way["highway"~"motorway|trunk|primary|secondary|tertiary"](${CITY_WIDE_BBOX});
+        way["highway"~"motorway|trunk|primary|secondary"](${CITY_WIDE_BBOX});
       );
       (._;>;);
       out body;
@@ -78,9 +78,9 @@ const buildGraph = async () => {
       return false;
     }
 
-    const elements = response.data.elements;
-    const nodes = {};
-    const ways = [];
+    let elements = response.data.elements;
+    let nodes = {};
+    let ways = [];
 
     elements.forEach(el => {
       if (el.type === 'node') nodes[el.id] = { lat: el.lat, lon: el.lon };
@@ -114,6 +114,13 @@ const buildGraph = async () => {
       }
     }
 
+    // MEMORY OPTIMIZATION: Flush massive arrays to trigger garbage collection BEFORE JSON stringify spike
+    elements = null;
+    response = null;
+    nodes = null;
+    ways = null;
+
+    console.log('Graph built in memory. Stringifying for Redis...');
     await redisClient.set('bengaluru_graph', JSON.stringify(graph));
     clearCache();
     console.log('Graph built successfully with real OSM data!');
