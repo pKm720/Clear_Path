@@ -22,7 +22,8 @@ const getUnifiedSensors = async () => {
     // Providing physical state to the ML engine to eliminate circular deadlocks
     let virtual_sensors = [];
     try {
-      const mlResponse = await axios.post('http://127.0.0.1:8000/predict', { 
+      const mlApiUrl = process.env.ML_API_URL || 'http://127.0.0.1:8000';
+      const mlResponse = await axios.post(`${mlApiUrl}/predict`, { 
         physical_sensors: physicalContext 
       }, { timeout: 3000 });
       

@@ -13,7 +13,11 @@ const swaggerSpec = require('./src/config/swagger');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use(cors());
+const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+app.use(cors({
+  origin: allowedOrigin,
+  credentials: true
+}));
 app.use(express.json());
 
 // Global Rate Limiter
