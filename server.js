@@ -13,6 +13,9 @@ const swaggerSpec = require('./src/config/swagger');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Trust the reverse proxy (Render load balancer) so express-rate-limit works properly
+app.set('trust proxy', 1);
+
 const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
 app.use(cors({
   origin: allowedOrigin,
