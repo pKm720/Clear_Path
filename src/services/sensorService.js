@@ -25,7 +25,7 @@ const getUnifiedSensors = async () => {
       const mlApiUrl = process.env.ML_API_URL || 'http://127.0.0.1:8000';
       const mlResponse = await axios.post(`${mlApiUrl}/predict`, { 
         physical_sensors: physicalContext 
-      }, { timeout: 3000 });
+      }, { timeout: 15000 });
       
       if (mlResponse.data && mlResponse.data.data) {
         // Mapping the ML predictions to the standard SensorReading schema
