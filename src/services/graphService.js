@@ -42,6 +42,9 @@ const buildGraph = async () => {
 
     console.log('Attempting to fetch live OSM data (Fast 30s Timeout)...');
     
+    // MEMORY OPTIMIZATION: Clear the old 100MB routing cache before allocating HTTP response chunks
+    clearCache();
+    
     const query = `
       [out:json][timeout:60];
       (

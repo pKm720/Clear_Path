@@ -19,10 +19,12 @@ const SPEED_KMH = {
 };
 
 // Max nodes A* can explore per mode (pedestrian paths are denser, need higher cap)
+// REDUCED drastically to prevent pathfinding from leaving huge garbage blobs
+// that cause Out-Of-Memory crashes during subsequent background graph rebuilds.
 const NODE_LIMIT = {
-  car: 100000,
-  motorbike: 100000,
-  pedestrian: 300000
+  car: 25000,
+  motorbike: 25000,
+  pedestrian: 50000
 };
 
 // Global in-memory cache for the massive graph and spatial index
