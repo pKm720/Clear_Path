@@ -1,4 +1,6 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const { redisClient } = require('../config/db');
 const { getUnifiedSensors } = require('./sensorService');
 const { calculateAQIForPoint, haversineDistance } = require('./interpolationService');
@@ -6,10 +8,14 @@ const { clearCache } = require('./routingService');
 
 const CENTER_BBOX = '12.91,77.56,13.04,77.70'; // High Density (Full Street Detail)
 const CITY_WIDE_BBOX = '12.83,77.37,13.14,77.83'; // Outer Suburbs (Major Arterials Only)
+const CACHE_PATH = path.join(__dirname, '../data/osm_bengaluru_cache.json');
+
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.openstreetmap.fr/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter'
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.n.osm.ch/api/interpreter',
+  'https://z.overpass-api.de/api/interpreter',
+  'https://overpass.openstreetmap.fr/api/interpreter'
 ];
 
 
@@ -60,19 +66,55 @@ const buildGraph = async () => {
 
     let response;
     let lastError;
+    let fetchedFromAPI = false;
+
+    const queryData = `data=${encodeURIComponent(query)}`;
+
     for (const mirror of OVERPASS_MIRRORS) {
       try {
         console.log(`Trying Overpass mirror: ${mirror} ...`);
-        response = await axios.post(mirror, `data=${encodeURIComponent(query)}`, {
-          timeout: 45000,
-          headers: { 'User-Agent': 'ClearPath-Arterial-Bot/1.2' }
+        response = await axios.post(mirror, queryData, {
+          timeout: 90000, // Increased to 90s for dense regions like Bengaluru
+          headers: { 
+            'User-Agent': 'ClearPath-Router/1.5 (https://github.com/pKm720/Clear_Path; contact: priyanshu@example.com)',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
         });
+        
         if (!response.data?.elements?.length) throw new Error('Empty OSM data from mirror');
+        
         console.log(`Successfully fetched OSM data from: ${mirror}`);
-        break; // Success — stop trying other mirrors
+        
+        // Save to local cache for future fallback
+        try {
+          fs.writeFileSync(CACHE_PATH, JSON.stringify(response.data));
+          console.log(`Saved fresh OSM data to local cache: ${CACHE_PATH}`);
+        } catch (fsErr) {
+          console.warn('Failed to write OSM cache to disk:', fsErr.message);
+        }
+        
+        fetchedFromAPI = true;
+        break; 
       } catch (err) {
         lastError = err;
-        console.warn(`Overpass Mirror Failed (${mirror}): ${err.message}. Trying next mirror...`);
+        const status = err.response ? `Status ${err.response.status}` : 'Network Error';
+        console.warn(`Overpass Mirror Failed (${mirror}): ${status} - ${err.message}.`);
+      }
+    }
+
+    // FALLBACK: If all mirrors fail, try to load from the local cache file
+    if (!fetchedFromAPI) {
+      console.log('All Overpass mirrors failed. Attempting to load from local file cache...');
+      if (fs.existsSync(CACHE_PATH)) {
+        try {
+          const cacheData = fs.readFileSync(CACHE_PATH, 'utf8');
+          response = { data: JSON.parse(cacheData) };
+          console.log(`Successfully loaded cached OSM data from: ${CACHE_PATH}`);
+        } catch (cacheErr) {
+          console.error('Local cache file is corrupted or unreadable:', cacheErr.message);
+        }
+      } else {
+        console.warn('No local cache file found.');
       }
     }
 
